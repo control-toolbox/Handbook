@@ -131,7 +131,9 @@ using LocalRegistry
 using MyPackage  # Load your package
 
 # Register in ct-registry
-register()
+register(MyPackage, 
+   registry = "ct-registry",
+   repo = "git@github.com:control-toolbox/MyPackage.jl.git")
 ```
 
 **Requirements**:
