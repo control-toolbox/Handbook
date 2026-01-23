@@ -159,6 +159,19 @@ register()
    ```
 
 4. **Create GitHub release** with tag `v1.2.0`
+    ```shell
+    # Checkout the branch
+    git checkout my-branch
+
+    # Create a lightweight tag
+    git tag v1.2.0
+
+    # Or create an annotated tag (preferred for releases)
+    git tag -a v1.2.0 -m "Release version 1.2.0"
+
+    # Push the tag to remote
+    git push origin v1.2.0
+    ```
 
 ### Register a Beta Version
 
