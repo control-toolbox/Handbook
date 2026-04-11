@@ -34,7 +34,7 @@ The local registry enables the **beta version strategy** for managing breaking c
 2. **Avoid breaking** existing users who depend on stable versions
 3. **Enable gradual migration** across the ecosystem
 
-**Solution**: Release beta versions (`v2.0.0-beta.1`) in `ct-registry` that:
+**Solution**: Release beta versions (`v2.0.0-beta`) in `ct-registry` that:
 
 - Are **invisible to regular users** (Julia resolver prefers stable versions)
 - Allow **developers to test** integration with new versions
