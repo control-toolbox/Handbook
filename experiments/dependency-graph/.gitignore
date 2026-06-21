@@ -1,6 +1,0 @@
-# Julia ephemeral environment files (created on each run)
-Project.toml
-Manifest.toml
-
-# Generated output
-dependency-graph.md
