@@ -23,6 +23,7 @@ Desktop.ini
 .idea/
 *.sublime-project
 *.sublime-workspace
+.claude
 
 # Backup files
 *.bak
