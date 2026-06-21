@@ -83,7 +83,7 @@ function extract_graph_from_pkg(; oc_version::Union{Nothing,String}=nothing)
     deps = Pkg.dependencies()
     ct_pkgs = filter(p -> startswith(p.second.name, "CT") || p.second.name == "OptimalControl", deps)
 
-    # Build graph
+    # Build graph with dependencies
     graph = Dict()
     for (uuid, pkg) in ct_pkgs
         pkg_deps = []
@@ -97,6 +97,19 @@ function extract_graph_from_pkg(; oc_version::Union{Nothing,String}=nothing)
         graph[pkg.name] = (pkg.version, pkg_deps)
     end
 
+    # Compute dependents (reverse dependencies)
+    for (pkg_name, (version, deps)) in graph
+        pkg_dependents = []
+        for (other_pkg_name, (other_version, other_deps)) in graph
+            for (dep_name, dep_version) in other_deps
+                if dep_name == pkg_name
+                    push!(pkg_dependents, (other_pkg_name, other_version))
+                end
+            end
+        end
+        graph[pkg_name] = (version, deps, pkg_dependents)
+    end
+
     return graph
 end
 
@@ -104,12 +117,12 @@ function print_graph(graph)
     """Print graph in readable format"""
     # Start with OptimalControl
     if haskey(graph, "OptimalControl")
-        version, deps = graph["OptimalControl"]
+        version, deps, _ = graph["OptimalControl"]
         println("OptimalControl v$version")
         for (dep_name, dep_version) in deps
             println("  ├── $dep_name v$dep_version")
             if haskey(graph, dep_name)
-                _, subdeps = graph[dep_name]
+                _, subdeps, _ = graph[dep_name]
                 for (subdep_name, subdep_version) in subdeps
                     println("  │   └── $subdep_name v$subdep_version")
                 end
@@ -118,10 +131,19 @@ function print_graph(graph)
     end
 
     println("\n=== Full Graph ===\n")
-    for (pkg_name, (version, deps)) in sort(collect(graph))
+    for (pkg_name, (version, deps, dependents)) in sort(collect(graph))
         println("$pkg_name v$version")
-        for (dep_name, dep_version) in deps
-            println("  → $dep_name v$dep_version")
+        if !isempty(deps)
+            println("  Dependencies:")
+            for (dep_name, dep_version) in sort(deps, by = x -> x[1])
+                println("    → $dep_name v$dep_version")
+            end
+        end
+        if !isempty(dependents)
+            println("  Dependents:")
+            for (dep_name, dep_version) in sort(dependents, by = x -> x[1])
+                println("    ← $dep_name v$dep_version")
+            end
         end
         println()
     end
@@ -136,7 +158,7 @@ function export_to_markdown(graph, filename="dependency-graph.md")
         write(io, "```\n")
 
         if haskey(graph, "OptimalControl")
-            version, deps = graph["OptimalControl"]
+            version, deps, _ = graph["OptimalControl"]
             write(io, "OptimalControl v$version\n")
             for (i, (dep_name, dep_version)) in enumerate(deps)
                 is_last = i == length(deps)
@@ -144,7 +166,7 @@ function export_to_markdown(graph, filename="dependency-graph.md")
                 write(io, "  $prefix $dep_name v$dep_version")
 
                 if haskey(graph, dep_name)
-                    _, subdeps = graph[dep_name]
+                    _, subdeps, _ = graph[dep_name]
                     if !isempty(subdeps)
                         write(io, " →")
                         for (j, (subdep_name, subdep_version)) in enumerate(subdeps)
@@ -163,13 +185,20 @@ function export_to_markdown(graph, filename="dependency-graph.md")
         write(io, "```\n\n")
         write(io, "## Package Details\n\n")
 
-        for (pkg_name, (version, deps)) in sort(collect(graph))
+        for (pkg_name, (version, deps, dependents)) in sort(collect(graph))
             write(io, "### $pkg_name v$version\n\n")
             if isempty(deps)
                 write(io, "No CT dependencies\n\n")
             else
                 write(io, "**Dependencies**:\n")
-                for (dep_name, dep_version) in deps
+                for (dep_name, dep_version) in sort(deps, by = x -> x[1])
+                    write(io, "- $dep_name v$dep_version\n")
+                end
+                write(io, "\n")
+            end
+            if !isempty(dependents)
+                write(io, "**Dependents**:\n")
+                for (dep_name, dep_version) in sort(dependents, by = x -> x[1])
                     write(io, "- $dep_name v$dep_version\n")
                 end
                 write(io, "\n")
