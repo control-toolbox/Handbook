@@ -438,3 +438,46 @@ Deployment is done automatically via CI with `DocumenterVitepress.deploydocs`. E
 - The GitHub repository exists
 - The `gh-pages` branch does not contain symlinks
 - CI workflows are configured for DocumenterVitepress
+
+### Restrict the workflow to stable tags only
+
+By default a documentation workflow triggers on `tags: '*'`, which includes prerelease
+tags such as `v0.26.0-beta`. DocumenterVitepress does **not** deploy prereleases when a
+higher stable version with the same major.minor already exists (e.g. `v0.26.0` already
+in the registry → `v0.26.0-beta` produces 0 VitePress bases). This causes `deploydocs`
+to crash because it expects a `bases.txt` file that was never written.
+
+Restrict the tag trigger to stable versions only in `.github/workflows/Documentation.yml`:
+
+```yaml
+on:
+  push:
+    branches:
+      - main          # deploys to the `dev/` subfolder
+    tags:
+      - 'v[0-9]+\.[0-9]+\.[0-9]+'   # v0.26.0 yes, v0.26.0-beta no
+  pull_request:
+    types: [labeled, synchronize, opened, reopened]
+```
+
+Push to `main` still deploys the `dev` version of the docs. Only pushes of stable tags
+trigger the versioned deployment.
+
+### Guard `deploydocs` against missing `bases.txt`
+
+As a belt-and-suspenders safeguard (e.g. if a prerelease tag is pushed despite the
+workflow filter), wrap the `deploydocs` call in `docs/make.jl` with an existence check:
+
+```julia
+bases_file = joinpath(@__DIR__, "build", "bases.txt")
+if isfile(bases_file)
+    DocumenterVitepress.deploydocs(;
+        repo=repo_url * ".git", devbranch="main", push_preview=true
+    )
+else
+    @info "Skipping deployment: no bases were built (prerelease with existing higher stable release)."
+end
+```
+
+If `makedocs` built 0 bases (any reason), the CI job completes cleanly instead of
+crashing at `deploydocs`.
