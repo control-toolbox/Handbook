@@ -63,11 +63,16 @@ makedocs(;
     ],
 )
 
-DocumenterVitepress.deploydocs(;
-    repo="github.com/MyOrg/MyPackage.jl.git",
-    devbranch="main",
-    push_preview=true,
-)
+bases_file = joinpath(@__DIR__, "build", "bases.txt")
+if isfile(bases_file)
+    DocumenterVitepress.deploydocs(;
+        repo="github.com/MyOrg/MyPackage.jl.git",
+        devbranch="main",
+        push_preview=true,
+    )
+else
+    @info "Skipping deployment: no bases were built (prerelease with existing higher stable release)."
+end
 ```
 
 > **Note — wrapped `makedocs`**: some packages wrap `makedocs` in a helper (e.g.
