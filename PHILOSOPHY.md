@@ -58,6 +58,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 | --- | --- |
 | [`modules.md`](philosophy/modules.md) | Submodule organization, imports/qualification, DAG, exports |
 | [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md) | Types vs traits, interfaces/contracts, SOLID/DRY/YAGNI, type stability |
+| [`dimension-and-shape.md`](philosophy/dimension-and-shape.md) | "1-D is a scalar" convention: state/control/variable shape, boundary rules, testing |
 | [`exceptions.md`](philosophy/exceptions.md) | The 7 exceptions and the choice rule |
 | [`docstrings.md`](philosophy/docstrings.md) | Docstring templates, cross-references, example safety |
 | [`testing.md`](philosophy/testing.md) | Categories, fakes/stubs, **module + callable function template** |
