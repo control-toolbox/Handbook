@@ -19,7 +19,9 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 
 3. **One abstract type per *noun*, one trait-parameter per *adjective*.** Conceptual
    variants ("is it an X or a Y") are types; orthogonal axes (autonomous?, in-place?, …)
-   are traits in a type parameter. Dispatch by extracting the trait.
+   are traits in a type parameter. Dispatch by extracting the trait. Aliases and
+   `where` clauses must repeat each named parameter's original bound verbatim, or
+   dispatch silently breaks.
    → [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md)
 
 4. **Program against abstractions.** Methods live on abstract types as much as
