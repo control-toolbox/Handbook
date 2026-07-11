@@ -37,6 +37,98 @@ const AbstractLazyThing  = AbstractThing{Lazy}
 
 Adding an axis is adding a parameter, not multiplying the type tree.
 
+## ⚠️ Aliases and `where`: never let a bound default to `Any`
+
+The example above is safe because it fixes the *only* parameter — nothing is left
+free, so there is no bound to get wrong. The pitfall appears as soon as a type has
+**more than one** parameter and the alias only fixes some of them.
+
+`<:` between two parametric types is a **structural** comparison of declared
+bounds — Julia does not look inside the body to notice that a wider bound is, in
+practice, harmless. Any alias or method signature that **names** a type parameter
+without repeating its original bound silently widens that parameter to `<:Any`,
+and the result stops being a subtype of the type it was meant to specialize — even
+though `isa` on any concrete instance still works fine, since instance membership
+and formal subtyping are checked differently. Method dispatch ranks overlapping
+methods using exactly that `<:` relation, so the bug stays invisible until two
+methods overlap for the same call: dispatch then either **silently picks the wrong
+(more generic) method**, or **throws `MethodError: ... is ambiguous` at the call
+site** — both far away from the alias declaration that caused it, and neither
+raised at definition time.
+
+```julia
+abstract type AbstractThing{M<:AbstractMode} end
+
+struct Concrete{M<:AbstractMode,Extra<:AbstractBound} <: AbstractThing{M}
+    data::Extra
+end
+
+# ✗ risky: Extra is named but its bound is dropped → defaults to Extra<:Any
+const EagerConcrete{Extra} = Concrete{Eager,Extra}
+EagerConcrete <: Concrete    # false — NOT a subtype, silently
+
+# ✓ safe #1: repeat the original bound verbatim
+const EagerConcrete{Extra<:AbstractBound} = Concrete{Eager,Extra}
+EagerConcrete <: Concrete    # true
+
+# ✓ safe #2 (preferred when possible): leave the untouched parameter out of the
+# braces entirely — Julia then reuses Concrete's own bound automatically, so
+# there is nothing to get wrong
+const EagerConcrete = Concrete{Eager}
+EagerConcrete <: Concrete    # true
+```
+
+The same rule applies to a method's own `where` clause, and it is **all-or-nothing**
+— dropping *one* bound among several is enough to break the relation, even if the
+others are correctly restated:
+
+```julia
+# ✗ TD's bound is dropped (should be TD<:AbstractMode) → mis-ranked or ambiguous
+# against a more generic method taking ::Concrete or ::AbstractThing
+process(x::Concrete{Eager,Extra}, y) where {Extra<:AbstractBound} = ...
+
+# ✓ every bound restated exactly as declared on Concrete
+process(x::Concrete{Eager,Extra}, y) where {Extra<:AbstractBound} = ...
+# (here TD is not even named — it is fixed to Eager — only Extra needs a bound;
+# the point is: whichever parameters you DO name must all carry their bound)
+```
+
+**Rule:** every time you name a type parameter — in a `const Alias{...} = ...`
+declaration or in a method's `where {...}` clause — copy its bound verbatim from
+the original `struct`/`abstract type`. If you don't need to restrict a trailing
+parameter, leave it out of the curly braces instead of naming it unbounded;
+Julia's own partial-application then carries the original bound forward for free,
+which is strictly safer than restating it by hand.
+
+This is not a corner case reserved for exotic code: it silently affects the exact
+alias pattern shown earlier in this file as soon as the aliased type has more than
+one parameter, which is the common case for any noun with both a trait axis and
+other structural parameters (a container type, a backing store, …).
+
+### Auditing a package
+
+Two greps surface **candidates** for manual review (not proof of a bug —
+cross-check each hit against the bounds actually declared on the type being
+aliased or dispatched on; many hits are innocuous, e.g. a parameter that was never
+bounded upstream, or a `where` clause matching a concrete type's own declaration
+rather than a shared, more-bounded ancestor):
+
+```bash
+# Aliases whose parameter list has zero `<:` (no bound restated at all)
+grep -rnE '^\s*const\s+[A-Za-z_][A-Za-z0-9_]*\{[A-Za-z_][A-Za-z0-9_]*(\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\}\s*=' --include='*.jl' src/
+
+# `where {...}` clauses with zero `<:` (every listed var defaults to Any)
+grep -rnE 'where \{[A-Za-z_][A-Za-z0-9_]*(\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\}' --include='*.jl' src/
+```
+
+The first grep is high-precision: a hit is almost always worth checking, because a
+`const Alias{...} = ...` declaring parameters with *zero* `<:` anywhere in its own
+parameter list means none of them repeat a bound. The second grep is noisier (a
+bare `where {A,B}` is often correct — e.g. a concrete type's own unbounded fields,
+or a callable struct's sole method) and needs one extra check per hit: does the
+type being dispatched on declare a bound, for that parameter, that this
+`where`-clause fails to repeat?
+
 ## When an axis becomes a type parameter (vs. stays an extracted trait)
 
 The criterion is not "is this axis important?" but:
@@ -159,6 +251,9 @@ one-time setup, user-facing API, and error paths.
 
 - [ ] One abstract type per noun; one trait-parameter per orthogonal axis.
 - [ ] Trait extractor + alias per variant; dispatch via extracted trait.
+- [ ] Every named type parameter (alias or `where`) repeats its original bound
+      verbatim; unconstrained trailing parameters are left out of the braces
+      instead of named unbounded.
 - [ ] Contracts are `NotImplemented` stubs on abstract types.
 - [ ] Signatures accept abstractions; subtypes honor the contract.
 - [ ] No abstract type encoding a capability (use a trait).

@@ -158,6 +158,27 @@ Mandatory pieces of `docs/src/index.md`: a `@meta CurrentModule` block, a one-pa
 scope statement, info/note/warning admonitions (notably the qualified-access policy), a
 module table, guide links via `[@ref]`, and a short Quick Start with qualified calls.
 
+## Code cell line width
+
+Lines inside `@example`, `@repl`, `@setup`, and plain ```` ```julia ```` code blocks
+should stay within **~75 characters**. Long calls must be wrapped with each
+argument on its own line and a trailing comma:
+
+```julia
+# Good — wrapped, each argument on its own line
+Strategies.build_strategy(
+    :collocation,
+    AbstractFakeDiscretizer, registry;
+    grid_size = 300,
+)
+
+# Bad — single line exceeds 75 chars
+Strategies.build_strategy(:collocation, AbstractFakeDiscretizer, registry; grid_size = 300)
+```
+
+This keeps rendered code readable on narrow screens and avoids horizontal
+scrolling in the documentation site.
+
 ## Checklist
 
 - [ ] `make.jl` uses `with_api_reference()`; `api_reference.jl` has generate/with/cleanup.

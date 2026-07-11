@@ -269,6 +269,38 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
   - REPL / GitHub Actions → colors enabled (`:color => true` by default)
   - Documenter / VitePress → plain text when wrapped with `IOContext(stdout, :color => false)`
 
+- **Plot image format — SVG vs PNG**: DocumenterVitepress selects the output format for
+  `@example` block plots by picking the MIME type with the **highest priority** among those
+  the plotting library supports:
+
+  | MIME type | Priority |
+  | --- | --- |
+  | `image/svg+xml` | 3.0 |
+  | `image/png` | 4.0 |
+
+  PNG wins by default. This is the **opposite** of `Documenter.HTML`, which prefers SVG.
+
+  - **CairoMakie** — produces SVG automatically because its figures do not respond to
+    `MIME"image/png"`. No action needed.
+
+  - **Plots.jl** — responds to both MIME types, so DocumenterVitepress picks PNG.
+    To get vector-quality SVG, disable PNG capture in your `@setup` block:
+
+    ````julia
+    ```@setup myblock
+    using Plots
+    Base.showable(::MIME"image/png", ::Plots.Plot) = false
+    ```
+    ````
+
+    This makes DocumenterVitepress fall back to `image/svg+xml`. The GR backend includes
+    `xmlns` in its SVG output, so DocumenterVitepress saves it as a separate `.svg` file
+    (referenced via `![](filename.svg)`).
+
+  Note: `Plots.default(fmt=:svg)` has **no effect** on MIME type selection — it only
+  controls the format used when Plots saves to a file path, not how Documenter captures
+  the result.
+
 - **Git repository required**: DocumenterVitepress requires a git repository to function
 - **Build output**: Documentation is generated in `docs/build/1/` (not `docs/build/`)
 - **Do not create Vitepress files manually**: always use `generate_template` (step 4) — it generates all config, theme, components, and npm files
