@@ -108,13 +108,17 @@ Separate categories with section comments inside one `@testset`.
 - Specific assertions (`≈ … atol=…`, `isa T`, `== n`), not `> 0` or `!= nothing`.
 - Names describe *what* is tested, not *how*.
 - Type-stability tests with `@inferred` on **function calls** (not field access);
-  allocation tests with `@allocated` for hot paths.
+  allocation tests for hot paths — prefer `BenchmarkTools.@ballocated` (steady-state,
+  excludes first-call compilation) over raw `@allocated`.
 
 ```julia
 Test.@test_nowarn Test.@inferred SubA.accessor(obj)   # ✅ a call
 # Test.@inferred obj.field                              # ❌ field access
-Test.@test (Test.@allocated SubA.accessor(obj)) == 0
+Test.@test (BenchmarkTools.@ballocated SubA.accessor($obj)) == 0
 ```
+
+For the full methodology — JET setup, hot-path vs. setup-path classification, and
+the allocation-contract file — see [`performance.md`](performance.md).
 
 ## Checklist
 
