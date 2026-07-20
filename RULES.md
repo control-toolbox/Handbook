@@ -48,13 +48,13 @@ julia --project -e 'using Pkg; Pkg.test("MyPackage"; test_args=["-a"])' 2>&1 | t
 
 Use `generate_report` on the captured log once MCP is available again.
 
-### Optional: run in the background with `Monitor`
+### Optional: run in the background with `Monitor` (Claude Code tool)
 
 For a slow suite (collocation/Ipopt-heavy, full regression run), the `tee`'d command
 does not have to block the session:
 
-1. Launch it via `Bash` with `run_in_background: true`.
-2. Arm `Monitor` on the log file, filtering for `"Test Failed"|"Error During Test"`
+1. Launch it via `Bash` (Claude Code tool) with `run_in_background: true`.
+2. Arm `Monitor` (Claude Code tool) on the log file, filtering for `"Test Failed"|"Error During Test"`
    (Julia `Test.jl`'s exact failure/error markers) — each match streams as a
    notification while the suite keeps running.
 3. Keep working (read code, draft the next change); the background task itself
