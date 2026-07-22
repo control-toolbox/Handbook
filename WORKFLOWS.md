@@ -69,6 +69,59 @@ but **on a pull request, only run when the `run ci` label is present.** You add 
 label to a PR when you want that check; you remove/re-add it to re-trigger (the caller
 also listens to the `labeled` event).
 
+### The `types:` list — and why `opened` must **not** be there
+
+The `if` guard is only half the gate. The other half is which pull-request events the
+caller subscribes to. For a **label-gated** workflow, the list is:
+
+```yaml
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]   # NOT `opened`
+```
+
+**Why `opened` is not just redundant but harmful.** Applying a label while opening a PR
+(`gh pr create --label "run ci gpu"`, or picking labels in the web UI form) emits **two**
+events: `opened` **and** `labeled`. With `opened` in the list, both match, the `if` guard
+passes for both, and the workflow runs **twice on the same commit**. On a self-hosted GPU
+runner that is a duplicated billed job for zero information. Measured on
+`CTFlows.jl#354`: two runs created at `20:04:59` and `20:05:00`.
+
+**Why dropping it loses nothing** — walk the four ways a label-gated run can legitimately
+start:
+
+| Situation | Event that fires | Covered without `opened`? |
+| --- | --- | --- |
+| PR opened **with** the label | `labeled` | ✅ — `labeled` fires even when the label is set at creation |
+| PR opened **without** the label | `opened` only | ✅ — nothing should run; the `if` guard would reject it anyway |
+| Label added later | `labeled` | ✅ |
+| New commits pushed | `synchronize` | ✅ |
+
+The second row is the key insight: a PR opened *without* the label must not run, so
+subscribing to `opened` can only ever produce a run that the `if` guard rejects — or, when
+the label *is* present, a duplicate of the `labeled` run. Either way it adds nothing.
+
+**Keep `reopened`.** Reopening a closed PR does **not** re-emit `labeled`, so a PR that
+still carries its label would never re-run without it. `reopened` is what covers that case;
+it is not interchangeable with `labeled`.
+
+**Prefer this over `concurrency: cancel-in-progress`.** A concurrency group would also
+collapse the duplicate, but it cancels a *running* job — and on the self-hosted GPU runner
+cancelling a Julia process was observed to leave an orphan process behind
+(`Terminate orphan process: pid (julia)`) and a pathologically slow next run. Not
+subscribing to the useless event is cheaper and has no such side effect.
+
+**The rule is specific to `if`-guarded, opt-in workflows.** Workflows that are *not*
+label-gated legitimately keep `opened` — indeed some exist only to react to it:
+`AddToProject.yml` uses `types: [opened]` and `AutoAssign.yml` uses
+`types: [opened, reopened]`, because adding a PR to the board and assigning a reviewer are
+exactly "on creation" actions. Formatter and SpellCheck set no `types:` filter at all and
+run on every PR event, which is also correct for a cheap GitHub-hosted check.
+
+So the discriminator is simple: **does the job carry a `contains(… .labels.*.name, 'run …')`
+guard?** If yes, `types: [labeled, synchronize, reopened]`. If no, subscribe to whatever
+events the job actually needs.
+
 ### The `run …` labels
 
 | Label | Triggers | Used in |
@@ -245,7 +298,9 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
   up on its next run. Keep inputs backward-compatible (add with a `default:`), or update
   the callers in lockstep.
 - **Per-repo trigger/inputs change** (different OS matrix, a new label, enabling
-  `ct-registry`): edit that repo's **caller** only.
+  `ct-registry`): edit that repo's **caller** only. Note this includes the `types:` list —
+  it lives in the caller, not in `CTActions`, so a fix like dropping `opened` (§2) has to be
+  applied **once per repo per label-gated caller**; it does not propagate via `@main`.
 - **Roll out a brand-new workflow:** add the reusable in `CTActions`, add the caller to
   `CTAppTemplate.jl` (so new repos inherit it), then copy the caller into the existing
   repos that need it.
@@ -265,5 +320,7 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
 - [ ] `AddToProject.yml` added **iff** tracked on the project board (`PROJECT_TOKEN` set).
 - [ ] CI inputs set (`versions`, `runs_on`, `use_ct_registry`).
 - [ ] `run …` labels created for every label-gated caller.
+- [ ] Every label-gated caller uses `types: [labeled, synchronize, reopened]` — **no `opened`**
+      (it duplicates the `labeled` run when a PR is created with its label; see §2).
 - [ ] Secrets configured (`SSH_KEY`, `DOCUMENTER_KEY`, `CODECOV_TOKEN`, `PROJECT_TOKEN`).
 - [ ] `README.template.md` present and `UpdateReadme.yml` inputs filled.
