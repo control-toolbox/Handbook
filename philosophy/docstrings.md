@@ -93,6 +93,78 @@ See also: [`MyPackage.SubA.ConcreteA`](@ref), [`MyPackage.SubA.ConcreteB`](@ref)
 abstract type AbstractThing end
 ```
 
+## Functor call operators: one docstring per group
+
+A **functor** (callable struct) that dispatches over several call signatures — e.g. one
+method per `(TimeDependence, VariableDependence)` combination — must carry **exactly one**
+docstring for the whole group, placed on the first method. Do **not** add a docstring to
+each individual method.
+
+```julia
+"""
+$(TYPEDSIGNATURES)
+
+Call operators for [`MyPackage.SubA.Thing`](@ref), dispatching on the `(TD, VD)` trait
+pair for the correct arity:
+
+| `TD` / `VD` | Call signature | Effective call |
+|---|---|---|
+| `Auton` / `Fixed` | `f(x)` | `_core(h, 0, x, ∅)` |
+| `NonAuton` / `Fixed` | `f(t, x)` | `_core(h, t, x, ∅)` |
+| `Auton` / `NonFixed` | `f(x, v)` | `_core(h, 0, x, v)` |
+| `NonAuton` / `NonFixed` | `f(t, x, v)` | `_core(h, t, x, v)` |
+"""
+function (h::Thing{Auton,Fixed,DF})(x) where {DF<:Function}
+    return _core(h, 0.0, x, nothing)
+end
+
+# no docstring here — already covered by the table above
+function (h::Thing{NonAuton,Fixed,DF})(t, x) where {DF<:Function}
+    return _core(h, t, x, nothing)
+end
+
+function (h::Thing{Auton,NonFixed,DF})(x, v) where {DF<:Function}
+    return _core(h, 0.0, x, v)
+end
+
+function (h::Thing{NonAuton,NonFixed,DF})(t, x, v) where {DF<:Function}
+    return _core(h, t, x, v)
+end
+```
+
+**Why**: for `function (h::T{ConcreteA,ConcreteB,...})(args...) where {...}`, Julia's
+`Base.Docs` keys the stored docstring on the method's `where`-clause, not on the
+receiver's concrete type parameters or the argument list. Every dispatch variant that
+shares the same `where` clause — which is the normal case for arity-dispatch functors —
+collides on the *same* storage key, regardless of differing type parameters or arg
+counts. Each subsequent docstring silently overwrites the previous one:
+
+```
+┌ Warning: Replacing docs for `MyPackage.SubA.Thing :: Union{Tuple{DF}, Tuple{Any, Any}} where {DF<:Function}` in module `MyPackage.SubA`
+└ @ Base.Docs docs/Docs.jl:249
+```
+
+This reproduces with a minimal callable struct:
+
+```julia
+struct T{A,B,DF} <: Function
+    d::DF
+end
+
+"""doc1"""
+function (h::T{AutonT,FixedT,DF})(x) where {DF<:Function} end
+
+"""doc2"""  # ← triggers "Replacing docs for T", even though A/B differ
+function (h::T{NonAutonT,FixedT,DF})(t, x) where {DF<:Function} end
+```
+
+Removing the second docstring (keeping only the first, with the dispatch table) makes
+the warning disappear — there is no real duplication to fix, only one docstring to write.
+
+This is a functor-specific exception to the "every method carries a docstring" default:
+the group is documented once, as a unit, because Julia's docsystem cannot distinguish
+the individual call-operator methods by signature.
+
 ## Cross-references
 
 - **Internal** (`@ref`): full module path including the root package.
