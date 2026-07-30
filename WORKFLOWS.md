@@ -23,11 +23,16 @@ jobs:
   call:
     uses: control-toolbox/CTActions/.github/workflows/ci.yml@main
     with:
-      runs_on: '["ubuntu-latest", "macos-latest"]'
+      runs_on: '["ubuntu-latest", "macos-latest", "windows-latest"]'
       use_ct_registry: true
     secrets:
       SSH_KEY: ${{ secrets.SSH_KEY }}
 ```
+
+`runs_on` should list all three GitHub-hosted OSes — Windows included. `CTBase` is the
+most up-to-date reference caller to copy from; it also carries a Windows-specific smoke
+test (`test-selection-smoke` in `CI.yml`) added after a real regression where Windows'
+backslash-separated relative paths silently broke a forward-slash glob (see §5).
 
 Why this design:
 
@@ -60,7 +65,15 @@ workflows are **opt-in per pull request via a label**. The caller guards its job
 ```yaml
 jobs:
   call:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run ci')
+    # A 'labeled' event fires once per label added, and re-evaluates against the PR's
+    # *current* full label set — so adding several labels in a row would otherwise
+    # re-run this job on every subsequent label add. Only react to 'labeled' when it's
+    # this specific label; for other trigger types (synchronize/reopened), fall back to
+    # checking the current label set as before.
+    if: >
+      github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'run ci') ||
+      (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'run ci'))
     uses: control-toolbox/CTActions/.github/workflows/ci.yml@main
 ```
 
@@ -68,6 +81,17 @@ Read this `if` as: **always run on `push`/`tag`** (the `main` branch must stay g
 but **on a pull request, only run when the `run ci` label is present.** You add the
 label to a PR when you want that check; you remove/re-add it to re-trigger (the caller
 also listens to the `labeled` event).
+
+**Why the guard is split into two branches instead of a single `contains(...)`.** A
+`labeled` event fires once *per label added*, and each firing re-evaluates the PR's
+*current, full* label set. If a PR already carries `run ci` and you add an unrelated
+label (say `bug`), that `labeled` event still passes a plain `contains(...)` check and
+re-runs CI for no reason. Gating the `labeled` branch on `github.event.label.name`
+(the label that was *just* added) fixes that: only labeling the PR with `run ci` itself
+triggers a run; other trigger types (`synchronize`, `reopened`) fall back to the
+simple `contains(...)` check since there is no single "label that fired" to compare
+against. This is the pattern actually in use (`CI.yml`, `Breakage.yml`,
+`Documentation.yml`) across `CTBase`, `CTFlows.jl`, `CTModels.jl`, `CTSolvers`, `CTLie`.
 
 ### The `types:` list — and why `opened` must **not** be there
 
@@ -126,13 +150,14 @@ events the job actually needs.
 
 | Label | Triggers | Used in |
 | --- | --- | --- |
-| `run ci` | CI test matrix | most packages |
-| `run ci cpu` | CI on GitHub-hosted CPU runners | OptimalControl (split CI) |
-| `run ci gpu` | CI on self-hosted GPU runner | OptimalControl (split CI) |
-| `run GPU` | dedicated GPU test job | CTDirect |
+| `run ci` | CI test matrix (single job) | most packages |
+| `run ci cpu` | CI on GitHub-hosted CPU runners | packages with split CI: OptimalControl, CTFlows.jl, CTSolvers (CTLie planned) |
+| `run ci gpu` | CI on self-hosted GPU runner | packages with split CI: OptimalControl, CTFlows.jl, CTSolvers (CTLie planned) |
+| `run GPU` | dedicated GPU test job | CTDirect (older, pre-split-CI pattern — not up to date, see §3.3) |
 | `run breakage` | breakage tests against downstream **packages** | core packages |
 | `run breakage applications` | breakage against downstream **applications/tutorials** | OptimalControl |
 | `run documentation` | full Documenter build on the PR | most packages |
+| `run probe` | standalone capability-probe scripts (see `CPUProbe.yml`/`GPUProbe.yml`, §3.3) | CTFlows.jl |
 
 Labels are defined per-repo (GitHub repository labels). When you bootstrap a new repo,
 create the labels you intend to use (`gh label create "run ci" --color 78f620
@@ -150,7 +175,7 @@ few **non-centralized / special** workflows (defined directly in a package).
 
 | Reusable (`CTActions`) | Caller name | Role | Typical trigger | Key inputs / secrets | PR label gate |
 | --- | --- | --- | --- | --- | --- |
-| `ci.yml` | `CI.yml` | Build + run the test suite over a Julia × OS × arch matrix | `push`, `tag`, PR | `versions`, `runs_on`, `archs`, `runner_type`, `use_ct_registry`; `SSH_KEY` | `run ci` |
+| `ci.yml` | `CI.yml` | Build + run the test suite over a Julia × OS × arch matrix | `push`, `tag`, PR | `versions`, `runs_on`, `archs`, `runner_type`, `use_ct_registry`; `SSH_KEY` | `run ci` (or `run ci cpu` / `run ci gpu` when split, see below) |
 | `coverage.yml` | `Coverage.yml` | Run tests with coverage, upload to Codecov | `push`/`tag` to `main` | `use_ct_registry`; `codecov-secret`, `SSH_KEY` | — (push only) |
 | `documentation.yml` | `Documentation.yml` | Build & deploy the Documenter site | `push`, `tag`, PR | `use_ct_registry`; `SSH_KEY`, `DOCUMENTER_KEY` | `run documentation` |
 | `breakage.yml` | `Breakage.yml` | Test that a change doesn't break downstream packages/apps (`latest`/`stable`); comment a result table on the PR | PR (labeled) | `pkgname`, `pkgpath`, `pkgversion`, `pkgbreak` (`test`/`doc`), `use_ct_registry`; `SSH_KEY` | `run breakage` |
@@ -160,6 +185,15 @@ few **non-centralized / special** workflows (defined directly in a package).
 | `update-readme.yml` | `UpdateReadme.yml` | Regenerate `README.md` from a template + the org's central `ABOUT/INSTALL/CONTRIBUTING.md` + badges | scheduled (weekly), `workflow_dispatch` | `template_file`, `output_file`, `package_name`, `repo_name`, `doc_url`, `citation_badge`, `assignee` | — |
 | `auto-assign.yml` | `AutoAssign.yml` | Auto-assign new issues/PRs to a maintainer | issue/PR opened | `assignees`, `numOfAssignee` | — |
 | `add-to-project.yml` | `AddToProject.yml` | Add new issues/PRs to the org project board (set Status) | issue/PR opened | `project-url`, `status`; `project_token` | — |
+
+**The `ci.yml` caller can be a single job or split in two.** A package that needs GPU
+tests calls `ci.yml` twice from its `CI.yml`: once as a `github`-runner CPU job
+(`runs_on` an array of GitHub-hosted labels, gated by `run ci cpu`) and once as a
+`self-hosted` GPU job (`runs_on: '[["kkt"]]'`, gated by `run ci gpu`). This is not an
+OptimalControl-specific quirk — `CTFlows.jl` and `CTSolvers` already use it, and `CTLie`
+is expected to move to it too, wherever the package has GPU-dependent code to test. A
+package with no GPU-relevant code (`CTModels.jl`, `CTParser.jl`, `CTLie` for now) keeps
+the single `call` job gated by plain `run ci`.
 
 ### 3.2 Maintenance workflows that live *in* `CTActions` (not called)
 
@@ -178,7 +212,8 @@ healthy. They are not `workflow_call` reusables.
 | `TagBot.yml` | every package | Thin wrapper over `JuliaRegistries/TagBot@v1`; standard upstream action, no shared logic to factor. Triggered by `issue_comment` from `JuliaTagBot` (registration) or `workflow_dispatch`. |
 | `setup-repo.yml` | **CTAppTemplate only** | One-shot bootstrap: renames the package, regenerates the UUID, sets authors/assignees, opens a setup PR. Meaningful only on a fresh clone of the template. |
 | `JOSS.yml` | **OptimalControl only** | Compiles the JOSS paper under `joss/`. Specific to the package that has a paper. |
-| `GPU.yml` | **CTDirect only** | Dedicated GPU test job on a self-hosted GPU runner, gated by `run GPU`. |
+| `GPU.yml` | **CTDirect only** | Dedicated GPU test job on a self-hosted GPU runner, gated by `run GPU`. Predates the `ci.yml` cpu/gpu split (§3.1); `CTDirect.jl` is not currently kept up to date with the rest of the fleet, so treat this entry as historical rather than the pattern to copy — copy the split-`ci.yml` pattern instead. |
+| `CPUProbe.yml`, `GPUProbe.yml` | **CTFlows.jl only** (so far) | Run standalone capability-probe scripts (`probe/cpu/probe_cpu.jl`, `probe/gpu/probe_gpu.jl`) on demand, separately from CI. Diagnostic only — always succeeds, prints a capability matrix. Used to keep documentation claims accurate and to support proof-of-concept exploration, not to gate merges. Gated by the `run probe` label (or `workflow_dispatch`); not centralized because the probe scripts are package-specific experiments, not shared CI logic. |
 | `benchmark-reusable.yml`, `benchmarks-orchestrator.yml` | **CTBenchmarks.jl only** | Benchmark orchestration specific to the benchmarking repo. |
 
 ---
@@ -195,13 +230,14 @@ Two workflows are **conditional**: `Breakage` and `AddToProject`.
 | CTBase | ✅ | ✅ | ✅ | — |
 | CTModels.jl | ✅ | ✅ | ✅ | — |
 | CTParser.jl | ✅ | ✅ | ✅ | — |
-| CTFlows.jl | ✅ | ✅ | — | — |
-| CTDirect.jl | ✅ | ✅ | ✅ | `GPU`, `Formatter` disabled |
-| CTSolvers | ✅ | ✅ | ✅ | — |
+| CTFlows.jl | ✅ | ✅ | — | split CI (cpu/gpu), `CPUProbe`/`GPUProbe` (`run probe`) |
+| CTDirect.jl | ✅ | ✅ | ✅ | `GPU`, `Formatter` disabled — **stale**, not currently kept up to date with the rest of the fleet |
+| CTSolvers | ✅ | ✅ | ✅ | split CI (cpu/gpu) |
 | OptimalControl | ✅ | ✅ | ✅ | `JOSS`, split CI (cpu/gpu) |
 | OptimalControlProblems | ✅ | — | — | — |
 | CTDiffFlow.jl | ✅ | — | — | — |
 | CTBenchmarks.jl | ✅ | — | — | `benchmark-*` |
+| CTLie | ✅ (no `AddToProject`) | ✅ (vs. `OptimalControl`) | — | new repo (2026); single `run ci` job so far, split CI (cpu/gpu) planned |
 
 **Why `Breakage` is present only in some repos.** Breakage answers: *"if I change this
 package, do its downstream consumers still build/test?"* It only makes sense for a
@@ -250,9 +286,11 @@ building. Set `use_ct_registry: false` for packages that only need the General r
 `ci.yml` accepts `runner_type: github | self-hosted` and a `runs_on` value (a single
 label string or a JSON array of labels). GitHub-hosted runners use
 `julia-actions/cache`; self-hosted runners use manual artifact/compiled-code caches.
-OptimalControl demonstrates the split: a `github` CPU job (`run ci cpu`) and a
-`self-hosted` GPU job on the `kkt` runner (`run ci gpu`). The self-hosted runners are
-the ones maintained by the scheduled `CTActions` maintenance workflows (§3.2).
+`OptimalControl`, `CTFlows.jl` and `CTSolvers` demonstrate the split (any package with
+GPU-dependent code to test): a `github` CPU job (`run ci cpu`) and a `self-hosted` GPU
+job on the `kkt` runner (`run ci gpu`). `CTLie` is expected to adopt the same split as
+it grows. The self-hosted runners are the ones maintained by the scheduled `CTActions`
+maintenance workflows (§3.2).
 
 ### Secrets used across the pipeline
 
@@ -282,14 +320,20 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
    for a leaf/peripheral repo.
 5. **Decide on `AddToProject`.** Add it (with the `PROJECT_TOKEN` secret) if the repo is
    tracked on the org project board.
-6. **Set CI inputs.** Choose `versions`, `runs_on`, and `use_ct_registry` in `CI.yml`.
-   Set `use_ct_registry: true` if the package needs `ct-registry`.
-7. **Create the `run …` labels** you reference (`run ci`, `run breakage`, `run
+6. **Set CI inputs.** Choose `versions`, `runs_on` (include `windows-latest` unless
+   there's a specific reason not to — `CTBase` is the reference caller to copy), and
+   `use_ct_registry` in `CI.yml`. Set `use_ct_registry: true` if the package needs
+   `ct-registry`.
+7. **Decide on a CPU/GPU split.** If the package has GPU-dependent code to test, split
+   `CI.yml` into a `github` CPU job (`run ci cpu`) and a `self-hosted` GPU job on `kkt`
+   (`run ci gpu`) instead of a single `run ci` job — see §3.1 and `CTFlows.jl`/`CTSolvers`
+   for the current pattern (not `CTDirect.jl`'s older `GPU.yml`, which predates it).
+8. **Create the `run …` labels** you reference (`run ci`, `run breakage`, `run
    documentation`, …) in the repo's label set.
-8. **Configure secrets** in the repo (or org): `SSH_KEY`, `DOCUMENTER_KEY`,
+9. **Configure secrets** in the repo (or org): `SSH_KEY`, `DOCUMENTER_KEY`,
    `CODECOV_TOKEN`, `PROJECT_TOKEN` as needed by the workflows you kept.
-9. **Provide `UpdateReadme` inputs.** Add a `README.template.md` and fill
-   `package_name`, `repo_name`, `doc_url` in `UpdateReadme.yml`, or the job self-skips.
+10. **Provide `UpdateReadme` inputs.** Add a `README.template.md` and fill
+    `package_name`, `repo_name`, `doc_url` in `UpdateReadme.yml`, or the job self-skips.
 
 ## 7. Recipe — **updating** workflows org-wide
 
@@ -318,7 +362,8 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
 - [ ] Base set present (CI, Coverage, Documentation, Formatter, SpellCheck, CompatHelper, UpdateReadme, AutoAssign, TagBot).
 - [ ] `Breakage.yml` added **iff** the repo has internal downstream consumers; matrix filled.
 - [ ] `AddToProject.yml` added **iff** tracked on the project board (`PROJECT_TOKEN` set).
-- [ ] CI inputs set (`versions`, `runs_on`, `use_ct_registry`).
+- [ ] CI inputs set (`versions`, `runs_on` — include `windows-latest`, `use_ct_registry`).
+- [ ] CPU/GPU split decided (`run ci cpu` + `run ci gpu` jobs) **iff** the package has GPU-dependent code to test.
 - [ ] `run …` labels created for every label-gated caller.
 - [ ] Every label-gated caller uses `types: [labeled, synchronize, reopened]` — **no `opened`**
       (it duplicates the `labeled` run when a PR is created with its label; see §2).
