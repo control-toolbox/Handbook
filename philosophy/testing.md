@@ -91,6 +91,56 @@ Verify stubs and error paths throw the right exception.
 
 Separate categories with section comments inside one `@testset`.
 
+### Capability-gated tests (GPU, hardware, …)
+
+A test that needs a runtime capability (CUDA, a specific hardware device, …) must not
+skip by **returning early from inside its own `@testset`**. An early `return` makes a
+correctly-skipped run (capability absent, as expected) and a silently-broken run
+(capability *should* be present but isn't) produce the exact same output: a green
+testset with zero assertions (`Pass 0`). Nothing in the summary tells them apart.
+
+```julia
+# ❌ Vacuous skip — indistinguishable from a real pass
+Test.@testset "GPU flows" begin
+    if !is_cuda_on()
+        @info "CUDA not functional — skipped"
+        return nothing
+    end
+    Test.@test some_gpu_assertion()
+end
+
+# ✅ Visible skip — shows as `Broken` in the summary
+Test.@testset "GPU flows" begin
+    if !is_cuda_on()
+        Test.@test_skip some_gpu_assertion()
+    else
+        Test.@test some_gpu_assertion()
+    end
+end
+```
+
+On the runner that is *supposed* to have the capability, make its absence fail loudly
+instead of silently — `RUNNER_NAME` is set by the GitHub Actions agent itself, no
+CI/CTActions change needed (see [`../WORKFLOWS.md`](../WORKFLOWS.md) for the `kkt`
+GPU runner name):
+
+```julia
+on_gpu_runner() = get(ENV, "RUNNER_NAME", "") == "kkt"
+
+if on_gpu_runner()
+    Test.@test is_cuda_on()   # fails loudly if the GPU runner lost its device
+end
+```
+
+Define the capability predicate (`is_cuda_on()` and similar) **once**, not once per
+test file — duplicated copies drift. Use a single `TestCapabilities` module: either in
+`test/runtests.jl` (`Main.TestCapabilities`) if the runner shares one process across
+files, or `test/helpers/capabilities.jl` `include`d by each file when the runner
+isolates each file in its own process (each file must then stand alone).
+
+Reference: control-toolbox/CTSolvers.jl#189 and #190 (original report and fix),
+control-toolbox/CTFlows.jl#375 (same pattern applied one level up).
+
 ## Critical rules
 
 1. **Structs at module top-level** — never inside test functions.
