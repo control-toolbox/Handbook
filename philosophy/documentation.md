@@ -160,27 +160,30 @@ module table, guide links via `[@ref]`, and a short Quick Start with qualified c
 
 ## Submodule imports in guides
 
-`@setup`/`@example` cells that call one submodule repeatedly should `import` it,
-never `using` it — `using Pkg.Sub` also pulls `Sub`'s `export`s into scope
-unqualified, silently allowing calls the guide never writes (e.g. bare
-`VectorField(...)` instead of `Data.VectorField(...)`). `import` binds only the
-submodule name, so every call still needs the qualified path.
+`@setup`/`@example` cells that call one submodule repeatedly should bring in the
+**submodule name only** — `using Pkg: Sub`, never `using Pkg.Sub`. The dotted form also
+pulls `Sub`'s `export`s into scope unqualified, silently allowing calls the guide never
+writes (e.g. bare `VectorField(...)` instead of `Data.VectorField(...)`); the
+`: Sub` form binds just the name, so every call still needs the qualified path. As
+everywhere else, `import` is not an option (see
+[`modules.md`](modules.md#using-never-import)).
 
 ```julia
 # ✅ short, qualified, no export leakage
-import CTBase: Data, Traits
+using CTBase: Data, Traits
 
 Data.VectorField(x -> -x)
 Traits.time_dependence(vf)
 ```
 
 ```julia
-# ❌ using leaks Data's exports — bare `VectorField(...)` silently also works
+# ❌ the dotted form leaks Data's exports — bare `VectorField(...)` silently also works
 using CTBase.Data
 ```
 
-For a guide that touches a submodule only once or twice, skip the import line and
-fully qualify instead: `using CTBase` then `CTBase.Sub.symbol(...)`.
+For a guide that touches a submodule only once or twice, skip that line and fully
+qualify instead: `using CTBase` then `CTBase.Sub.symbol(...)` — the package top level
+exports nothing, so this brings no symbols into scope.
 
 ## Code cell line width
 
@@ -210,6 +213,6 @@ scrolling in the documentation site.
 - [ ] Extensions detected via `Base.get_extension` and documented when present.
 - [ ] `InterLinks` set up and passed via `plugins=[links]` if `@extref` is used.
 - [ ] Guides under `docs/src/<topic>/`; no hand-written API pages.
-- [ ] Guide setup cells `import` a submodule they call repeatedly (`import CTBase: Sub`); one-off calls use `using CTBase` + full qualification instead.
+- [ ] Guide setup cells bind the submodule name of a submodule they call repeatedly (`using CTBase: Sub`, never `using CTBase.Sub`); one-off calls use `using CTBase` + full qualification instead.
 - [ ] `index.md` has meta, scope, admonitions, module table, guide links, Quick Start.
 - [ ] Built clean: draft (links) → per file → full.

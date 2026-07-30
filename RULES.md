@@ -177,6 +177,10 @@ On every build, **`tee`** the output to `/tmp/…` and filter (`grep -E
   shell for reading or modifying files.
 - **Read before editing**; do not overwrite a file you have not read.
 - An edit should match the surrounding code (style, naming, comment density).
+- Never introduce an `import` in Julia code: dependencies come into scope with `using`
+  only, and method extensions are written qualified (`Base.show(...)`, `Mod.f(...)`).
+  Rule and translation table in
+  [`philosophy/modules.md`](philosophy/modules.md#using-never-import).
 
 ---
 

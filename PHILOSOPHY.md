@@ -13,9 +13,11 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
    directory, its own manifest. The package manifest exports **nothing**.
    → [`modules.md`](philosophy/modules.md)
 
-2. **Everything is qualified.** Import modules, not their symbols; call
-   `Module.symbol` everywhere. Explicit origin, safe refactors, no shadowing.
-   → [`modules.md`](philosophy/modules.md)
+2. **Everything is qualified — with `using`, never `import`.** Bring modules into
+   scope, not their symbols (`using Pkg: Pkg`, `using Pkg: Sub`); call `Module.symbol`
+   everywhere and extend methods qualified (`Base.show(...)`). Explicit origin, safe
+   refactors, no shadowing.
+   → [`modules.md`](philosophy/modules.md#using-never-import)
 
 3. **One abstract type per *noun*, one trait-parameter per *adjective*.** Conceptual
    variants ("is it an X or a Y") are types; orthogonal axes (autonomous?, in-place?, …)
