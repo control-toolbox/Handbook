@@ -1,7 +1,7 @@
 # Exceptions
 
 Structured, informative errors. The ecosystem provides seven exception types under
-`CTException`, imported via `import CTBase.Exceptions`.
+`CTException`, brought into scope via `using CTBase: Exceptions`.
 
 ## Principles
 
@@ -38,7 +38,7 @@ Note the fields: `IncorrectArgument` has `got`/`expected` (**no** `reason`);
 ## Examples (generic)
 
 ```julia
-import CTBase.Exceptions
+using CTBase: Exceptions
 
 # Single-argument domain violation
 throw(Exceptions.IncorrectArgument(

@@ -23,10 +23,9 @@ the outer scope** so the test runner can call it.
 module TestName
 
 # Qualified imports — bring module names into scope, call Sub.sym everywhere
-import Test
-import CTBase.Exceptions: Exceptions
-import MyPackage.SubA: SubA
-import MyPackage.SubB: SubB
+using Test: Test
+using CTBase: Exceptions
+using MyPackage: SubA, SubB
 
 # Test options (verbose / timing), overridable by the runner
 const VERBOSE    = isdefined(Main, :TestOptions) ? Main.TestOptions.VERBOSE    : true
@@ -51,8 +50,9 @@ test_name() = TestName.test_name()
 
 Why each part:
 - **Module wrapper** — isolates names per file; avoids clashes across the suite.
-- **Qualified imports** (`import X: X`) — the module name is in scope, call sites read
-  `SubA.sym`; same policy as the source (see [`modules.md`](modules.md)).
+- **Qualified imports** (`using X: X`, `using Pkg: Sub`) — the module name is in scope,
+  call sites read `SubA.sym`; same policy as the source, `import` included: never
+  (see [`modules.md`](modules.md#using-never-import)).
 - **Top-level fakes** — defining a `struct` inside a function triggers world-age errors.
 - **Outer redefinition** — the runner discovers and calls `test_name()` at top level.
 
@@ -123,7 +123,8 @@ the allocation-contract file — see [`performance.md`](performance.md).
 ## Checklist
 
 - [ ] File is a module; entry `test_<name>()`; redefined in the outer scope.
-- [ ] All imports qualified; all calls qualified (root omitted for submodules).
+- [ ] All imports qualified and written with `using` (never `import`); all calls
+      qualified (root omitted for submodules).
 - [ ] Fakes/stubs defined at module top-level.
 - [ ] Categories present and separated (unit / integration / contract / error).
 - [ ] Error paths use `@test_throws`; extension stubs use fake types.
