@@ -158,6 +158,30 @@ Mandatory pieces of `docs/src/index.md`: a `@meta CurrentModule` block, a one-pa
 scope statement, info/note/warning admonitions (notably the qualified-access policy), a
 module table, guide links via `[@ref]`, and a short Quick Start with qualified calls.
 
+## Submodule imports in guides
+
+`@setup`/`@example` cells that call one submodule repeatedly should `import` it,
+never `using` it — `using Pkg.Sub` also pulls `Sub`'s `export`s into scope
+unqualified, silently allowing calls the guide never writes (e.g. bare
+`VectorField(...)` instead of `Data.VectorField(...)`). `import` binds only the
+submodule name, so every call still needs the qualified path.
+
+```julia
+# ✅ short, qualified, no export leakage
+import CTBase: Data, Traits
+
+Data.VectorField(x -> -x)
+Traits.time_dependence(vf)
+```
+
+```julia
+# ❌ using leaks Data's exports — bare `VectorField(...)` silently also works
+using CTBase.Data
+```
+
+For a guide that touches a submodule only once or twice, skip the import line and
+fully qualify instead: `using CTBase` then `CTBase.Sub.symbol(...)`.
+
 ## Code cell line width
 
 Lines inside `@example`, `@repl`, `@setup`, and plain ```` ```julia ```` code blocks
@@ -186,5 +210,6 @@ scrolling in the documentation site.
 - [ ] Extensions detected via `Base.get_extension` and documented when present.
 - [ ] `InterLinks` set up and passed via `plugins=[links]` if `@extref` is used.
 - [ ] Guides under `docs/src/<topic>/`; no hand-written API pages.
+- [ ] Guide setup cells `import` a submodule they call repeatedly (`import CTBase: Sub`); one-off calls use `using CTBase` + full qualification instead.
 - [ ] `index.md` has meta, scope, admonitions, module table, guide links, Quick Start.
 - [ ] Built clean: draft (links) → per file → full.
