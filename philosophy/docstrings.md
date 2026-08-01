@@ -175,6 +175,45 @@ the individual call-operator methods by signature.
 
 Use `@ref` for symbols documented in the current package, `@extref` for dependencies.
 
+### Self-reference for extensible generics
+
+A docstring on a generic function or type that **other packages are expected to
+extend** (shared accessors like `state`, `control`, `dual`, ...) is not safe to treat
+as purely "internal", even though its target lives in the current package.
+
+**Why**: Julia docstrings attach to a *binding* (module + name), not to an individual
+method. When a downstream package adds a new method to your generic, its docstring is
+appended to the *same* accumulated doc object — there is no way to render "just this
+package's part". Any `@docs` block on that generic, wherever it is written, renders the
+full combined text. If your original docstring used `@ref` for a same-package
+cross-reference, that `@ref` is carried into the downstream build verbatim — and `@ref`
+only resolves against bindings documented in the *current* `makedocs()` build. The
+downstream package never documents your other submodule's binding, so the link breaks
+there, even though it resolves fine in your own docs.
+
+**Rule**: for any cross-submodule reference inside a docstring on a symbol that other
+packages might extend, use `@extref MyPackage.Submodule.symbol` — self-referencing your
+own published inventory — instead of `@ref`. `@extref` resolves the same way regardless
+of which package's build is rendering the (possibly transcluded) text. Requires a
+self-referencing `InterLinks` entry; see
+[`documentation.md`](documentation.md#self-reference-for-extensible-generics).
+
+```julia
+# ❌ breaks once a downstream package extends `state` and transcludes this docstring
+"""
+...
+See also: [`MyPackage.Solutions.Solution`](@ref)
+"""
+function state(...) end
+
+# ✅ resolves both locally and when transcluded into a downstream package's docs
+"""
+...
+See also: [`MyPackage.Solutions.Solution`](@extref)
+"""
+function state(...) end
+```
+
 ## Module-prefix convention in examples
 
 - Exported symbol after `using MyPackage.SubA`: call it bare (`do_thing(...)`).
@@ -205,4 +244,6 @@ Use these instead of writing signatures by hand.
 - [ ] One-sentence summary; all args/fields documented; returns and throws when relevant.
 - [ ] Example is safe, runnable, and typical.
 - [ ] `@ref` for internal, `@extref` for external; full module paths.
+- [ ] Cross-submodule refs inside a docstring on an extensible generic use `@extref`
+      (self-referencing), not `@ref`.
 - [ ] No invented behavior; consistent terminology.

@@ -137,6 +137,52 @@ links = InterLinks(
 makedocs(; plugins=[links], ...)   # makes [`OtherPkg.Sub.Sym`](@extref) resolve
 ```
 
+The third element is a fallback inventory *location* — `InterLinks` tries each entry in
+order and uses the first reachable one. It can be a URL or a local file path (see the
+two self-contained patterns below).
+
+### Self-reference for extensible generics
+
+A package whose shared generics get extended by downstream packages (see
+[`docstrings.md`](docstrings.md#self-reference-for-extensible-generics)) must register
+**itself** as an `InterLinks` target, so its own `@extref` cross-submodule references
+resolve both in its own build and when transcluded into a downstream package's docs:
+
+```julia
+links = InterLinks(
+    "MyPackage" => (
+        "https://.../MyPackage.jl/stable/",
+        joinpath(@__DIR__, "build", "1", "objects.inv"),  # this repo's own last build
+        "https://.../MyPackage.jl/stable/objects.inv",
+    ),
+    ...
+)
+```
+
+The local path is checked first, so the self-references are verifiable from a plain
+local build — no publish required. It only fails to resolve on the very first build of
+a fresh docs setup (no local inventory exists yet); every build after that resolves
+against the freshly-produced one.
+
+### Local fallback for sibling packages (cross-repo development)
+
+While developing across sibling repos — e.g. `Pkg.develop`-ing a sibling package to
+verify an in-progress change before it is released — point that package's `InterLinks`
+entry at the sibling's own local build output instead of only its published URL, so
+cross-package `@extref`s are verifiable without a release:
+
+```julia
+"OtherPkg" => (
+    "https://.../OtherPkg.jl/stable/",
+    joinpath(@__DIR__, "..", "..", "OtherPkg.jl", "docs", "build", "1", "objects.inv"),
+    "https://.../OtherPkg.jl/stable/objects.inv",
+),
+```
+
+Same "first reachable wins" mechanism as above — falls back to the published inventory
+once the sibling's local build doesn't exist (e.g. in CI, where sibling repos aren't
+checked out side by side).
+
 ## The draft switch (development workflow)
 
 `make.jl` exposes `draft`. In draft mode, `@example`/`@setup` Julia cells are **not
@@ -212,6 +258,8 @@ scrolling in the documentation site.
 - [ ] One `automatic_reference_documentation` per submodule (`public=true, private=false`) + one unified Internals page (`public=false, private=true`).
 - [ ] Extensions detected via `Base.get_extension` and documented when present.
 - [ ] `InterLinks` set up and passed via `plugins=[links]` if `@extref` is used.
+- [ ] Packages with extensible generics self-reference in `InterLinks`, local build path
+      checked before the published URL.
 - [ ] Guides under `docs/src/<topic>/`; no hand-written API pages.
 - [ ] Guide setup cells bind the submodule name of a submodule they call repeatedly (`using CTBase: Sub`, never `using CTBase.Sub`); one-off calls use `using CTBase` + full qualification instead.
 - [ ] `index.md` has meta, scope, admonitions, module table, guide links, Quick Start.
