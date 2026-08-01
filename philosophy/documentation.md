@@ -162,7 +162,10 @@ links = InterLinks(
 The local path is checked first, so the self-references are verifiable from a plain
 local build — no publish required. It only fails to resolve on the very first build of
 a fresh docs setup (no local inventory exists yet); every build after that resolves
-against the freshly-produced one.
+against the freshly-produced one. On that first build, expect `DocumenterInterLinks` to
+log a `cannot resolve external link` `@error` for every self-referenced symbol — this is
+non-fatal (`makedocs` still completes) and is not a sign the setup is broken; just run
+`make.jl` a second time.
 
 ### Local fallback for sibling packages (cross-repo development)
 

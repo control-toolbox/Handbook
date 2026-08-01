@@ -214,6 +214,25 @@ See also: [`MyPackage.Solutions.Solution`](@extref)
 function state(...) end
 ```
 
+**Caveats** — `@extref` resolves against a serialized inventory (`objects.inv`), not the
+live in-build doc tree, so it is stricter than `@ref` in two ways:
+
+- **No bare names.** `@extref` only matches an exact, fully-qualified entry in the
+  inventory. `[`do_thing`](@extref)` silently fails to resolve even when `do_thing` is
+  unambiguous in context; it must be `[`MyPackage.SubA.do_thing`](@extref)`. `@ref` is more
+  forgiving here because it can fall back to Documenter's own in-build name resolution —
+  which is exactly the behavior that doesn't carry over to a downstream build, so don't
+  rely on it even where it happens to work locally.
+- **No signature disambiguation.** When a generic has several methods each with their own
+  docstring, `@ref` can pick one by its call signature (e.g.
+  `` [`f(x::Int)`](@ref) `` vs. `` [`f(x::Float64)`](@ref) ``) by matching against the live
+  doc tree. `@extref` cannot: the inventory indexes plain qualified names only, so a
+  signature-suffixed target never resolves. If a `See also` needs to point at one specific
+  overload among several on the same self-referencing generic, keep that particular
+  reference `@ref` — it only ever needs to resolve within the package's own build, since
+  the disambiguation is for readers of *this* package's docs, not for a downstream package
+  extending the generic.
+
 ## Module-prefix convention in examples
 
 - Exported symbol after `using MyPackage.SubA`: call it bare (`do_thing(...)`).
@@ -245,5 +264,7 @@ Use these instead of writing signatures by hand.
 - [ ] Example is safe, runnable, and typical.
 - [ ] `@ref` for internal, `@extref` for external; full module paths.
 - [ ] Cross-submodule refs inside a docstring on an extensible generic use `@extref`
-      (self-referencing), not `@ref`.
+      (self-referencing), not `@ref`. Every such target is fully qualified (no bare
+      names) and carries no call-signature suffix (keep signature-disambiguated
+      targets `@ref`).
 - [ ] No invented behavior; consistent terminology.
