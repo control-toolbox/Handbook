@@ -121,11 +121,11 @@ end
 
 On the runner that is *supposed* to have the capability, make its absence fail loudly
 instead of silently — `RUNNER_NAME` is set by the GitHub Actions agent itself, no
-CI/CTActions change needed (see [`../WORKFLOWS.md`](../WORKFLOWS.md) for the `kkt`
-GPU runner name):
+CI/CTActions change needed (see [`../WORKFLOWS.md`](../WORKFLOWS.md) for the
+`kkt`/`occidata` GPU runner names):
 
 ```julia
-on_gpu_runner() = get(ENV, "RUNNER_NAME", "") == "kkt"
+on_gpu_runner() = get(ENV, "RUNNER_NAME", "") in ("kkt", "occidata")
 
 if on_gpu_runner()
     Test.@test is_cuda_on()   # fails loudly if the GPU runner lost its device

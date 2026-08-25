@@ -153,6 +153,7 @@ events the job actually needs.
 | `run ci` | CI test matrix (single job) | most packages |
 | `github-runner` | CI on GitHub-hosted runners | packages with split CI: OptimalControl, CTFlows.jl, CTParser.jl, CTSolvers (CTLie planned) |
 | `kkt-runner` | CI on the self-hosted `kkt` GPU runner | packages with split CI: OptimalControl, CTFlows.jl, CTParser.jl, CTSolvers (CTLie planned) |
+| `occidata-runner` | CI on the self-hosted `occidata` GPU runner | packages with heavier GPU workloads: CTFlows.jl (CTLie planned) |
 | `run GPU` | dedicated GPU test job | CTDirect (older, pre-split-CI pattern — not up to date, see §3.3) |
 | `run breakage` | breakage tests against downstream **packages** | core packages |
 | `run breakage applications` | breakage against downstream **applications/tutorials** | OptimalControl |
@@ -167,7 +168,9 @@ meaningfully "the CPU job", it is the job that runs on GitHub's runners (and hap
 exercise CPU paths); the other job is defined by the self-hosted machine it lands on
 (`kkt`). Naming the label after the runner also keeps the label, the `runs_on` value and
 the job name saying the same thing, and it extends by construction to a future runner
-(`<name>-runner`) without inventing a new workload adjective.
+(`<name>-runner`) without inventing a new workload adjective — `occidata-runner`
+(added to CTFlows.jl on 2026-08-24) is exactly that extension in practice, a second
+self-hosted GPU box alongside `kkt` for heavier GPU workloads.
 
 **This vocabulary is fleet-wide, not a per-repo choice.** Labels are the user-facing
 trigger surface: someone applying a label from muscle memory in a sibling repo, or
@@ -202,14 +205,17 @@ few **non-centralized / special** workflows (defined directly in a package).
 | `auto-assign.yml` | `AutoAssign.yml` | Auto-assign new issues/PRs to a maintainer | issue/PR opened | `assignees`, `numOfAssignee` | — |
 | `add-to-project.yml` | `AddToProject.yml` | Add new issues/PRs to the org project board (set Status) | issue/PR opened | `project-url`, `status`; `project_token` | — |
 
-**The `ci.yml` caller can be a single job or split in two.** A package that needs GPU
-tests calls `ci.yml` twice from its `CI.yml`: once as a GitHub-hosted job
-(`runs_on` an array of GitHub-hosted labels, gated by `github-runner`) and once as a
-`self-hosted` GPU job (`runs_on: '[["kkt"]]'`, gated by `kkt-runner`). This is not an
+**The `ci.yml` caller can be a single job, split in two, or split in three.** A package
+that needs GPU tests calls `ci.yml` twice (or three times) from its `CI.yml`: once as a
+GitHub-hosted job (`runs_on` an array of GitHub-hosted labels, gated by `github-runner`),
+once as a `self-hosted` GPU job on `kkt` (`runs_on: '[["kkt"]]'`, gated by `kkt-runner`),
+and — for packages with heavier GPU workloads — a second `self-hosted` GPU job on
+`occidata` (`runs_on: '[["occidata"]]'`, gated by `occidata-runner`). This is not an
 OptimalControl-specific quirk — `CTFlows.jl`, `CTParser.jl` and `CTSolvers` already use
-it, and `CTLie` is expected to move to it too, wherever the package has GPU-dependent
-code to test. A package with no GPU-relevant code (`CTModels.jl`, `CTLie` for now) keeps
-the single `call` job gated by plain `run ci`.
+the two-way split, `CTFlows.jl` has since added the third `occidata` job, and `CTLie` is
+expected to move to it too, wherever the package has GPU-dependent code to test. A
+package with no GPU-relevant code (`CTModels.jl`, `CTLie` for now) keeps the single
+`call` job gated by plain `run ci`.
 
 > `CTParser.jl` belongs in the split group: its `test/Project.toml` depends on `CUDA`,
 > `MadNLPGPU`, `KernelAbstractions` and `ExaModels`, `test/runtests.jl` loads them
@@ -225,6 +231,10 @@ healthy. They are not `workflow_call` reusables.
 | --- | --- | --- |
 | `occidata-runner-maintenance.yml` | Purge Julia compile cache, update TeXLive, rotate logs on the `occidata` self-hosted runner | weekly cron, `workflow_dispatch` |
 | `remove-julia.yml` | Wipe stale Julia installs on a self-hosted runner | weekly cron, `workflow_dispatch` |
+
+`occidata` started as the target of this maintenance workflow only; since CTFlows.jl's
+`occidata-runner` job (§3.1, added 2026-08-24) it is also a live GPU CI target for
+package test matrices, not just a runner kept healthy for its own sake.
 
 ### 3.3 Non-centralized / per-repo special workflows
 
@@ -258,7 +268,7 @@ Two workflows are **conditional**: `Breakage` and `AddToProject`.
 | OptimalControlProblems | ✅ | — | — | — |
 | CTDiffFlow.jl | ✅ | — | — | — |
 | CTBenchmarks.jl | ✅ | — | — | `benchmark-*` |
-| CTLie | ✅ (no `AddToProject`) | ✅ (vs. `OptimalControl`) | — | new repo (2026); single `run ci` job so far, split CI (`github-runner`/`kkt-runner`) planned |
+| CTLie | ✅ (no `AddToProject`) | ✅ (vs. `OptimalControl`) | — | new repo (2026); single `run ci` job so far, split CI (`github-runner`/`kkt-runner`/`occidata-runner`) planned |
 
 **Why `Breakage` is present only in some repos.** Breakage answers: *"if I change this
 package, do its downstream consumers still build/test?"* It only makes sense for a
@@ -310,9 +320,10 @@ label string or a JSON array of labels). GitHub-hosted runners use
 `OptimalControl`, `CTFlows.jl`, `CTParser.jl` and `CTSolvers` demonstrate the split (any
 package with GPU-dependent code to test): a `github` job (`github-runner`) and a
 `self-hosted` GPU job on the `kkt` runner (`kkt-runner`) — the labels are named after
-the runner, see §2. `CTLie` is expected to adopt the same split as it grows. The
-self-hosted runners are the ones maintained by the scheduled `CTActions` maintenance
-workflows (§3.2).
+the runner, see §2. `CTFlows.jl` also runs a second `self-hosted` GPU job on the
+`occidata` runner (`occidata-runner`) for heavier GPU workloads. `CTLie` is expected to
+adopt the same split as it grows. The self-hosted runners are the ones maintained by
+the scheduled `CTActions` maintenance workflows (§3.2).
 
 ### Secrets used across the pipeline
 
@@ -350,10 +361,12 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
    `CI.yml` into a `github` job (`github-runner`) and a `self-hosted` GPU job on `kkt`
    (`kkt-runner`) instead of a single `run ci` job — see §3.1 and
    `CTFlows.jl`/`CTParser.jl`/`CTSolvers` for the current pattern (not `CTDirect.jl`'s
-   older `GPU.yml`, which predates it). Use those two label names verbatim; the former
-   `run ci cpu` / `run ci gpu` spelling is deprecated (§2).
+   older `GPU.yml`, which predates it). For heavier GPU workloads, add a third job on
+   the `occidata` runner (`occidata-runner`) — see `CTFlows.jl`. Use those label names
+   verbatim; the former `run ci cpu` / `run ci gpu` spelling is deprecated (§2).
 8. **Create the trigger labels** you reference (`run ci`, `run breakage`, `run
-   documentation`, `github-runner`/`kkt-runner` when split, …) in the repo's label set.
+   documentation`, `github-runner`/`kkt-runner`/`occidata-runner` when split, …) in the
+   repo's label set.
 9. **Configure secrets** in the repo (or org): `SSH_KEY`, `DOCUMENTER_KEY`,
    `CODECOV_TOKEN`, `PROJECT_TOKEN` as needed by the workflows you kept.
 10. **Provide `UpdateReadme` inputs.** Add a `README.template.md` and fill
@@ -395,8 +408,8 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
 - [ ] `Breakage.yml` added **iff** the repo has internal downstream consumers; matrix filled.
 - [ ] `AddToProject.yml` added **iff** tracked on the project board (`PROJECT_TOKEN` set).
 - [ ] CI inputs set (`versions`, `runs_on` — include `windows-latest`, `use_ct_registry`).
-- [ ] Runner split decided (`github-runner` + `kkt-runner` jobs) **iff** the package has GPU-dependent code to test.
-- [ ] Trigger labels created for every label-gated caller (`run …`, plus `github-runner`/`kkt-runner` when split).
+- [ ] Runner split decided (`github-runner` + `kkt-runner` jobs, plus `occidata-runner` for heavier GPU workloads) **iff** the package has GPU-dependent code to test.
+- [ ] Trigger labels created for every label-gated caller (`run …`, plus `github-runner`/`kkt-runner`/`occidata-runner` when split).
 - [ ] Every label-gated caller uses `types: [labeled, synchronize, reopened]` — **no `opened`**
       (it duplicates the `labeled` run when a PR is created with its label; see §2).
 - [ ] Secrets configured (`SSH_KEY`, `DOCUMENTER_KEY`, `CODECOV_TOKEN`, `PROJECT_TOKEN`).
