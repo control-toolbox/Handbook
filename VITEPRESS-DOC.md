@@ -238,16 +238,20 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
 
 ## Important notes
 
-- **`@repl` vs `@example` — ANSI color rule**: DocumenterVitepress processes code block output differently depending on the block type:
+- **`@repl` vs `@example` — ANSI color rule**: Before `DocumenterVitepress` **v0.3.5**, ANSI-colored output from `@repl` was emitted as a ` ```julia ` fence and rendered as raw escape sequences. This limitation was fixed in v0.3.5 ([#373](https://github.com/LuxDL/DocumenterVitepress.jl/pull/373)): colored `@repl` output is now rendered as ANSI while the input remains Julia syntax-highlighted.
 
-  | Block type | Output fence | ANSI codes | Result |
-  | --- | --- | --- | --- |
-  | `@example` | ` ```ansi ` | processed by Shiki | **colors render correctly** |
-  | `@repl` | ` ```julia ` | parsed as Julia syntax | **raw escape sequences — ugly** |
+  | Block type | Behaviour in `DocumenterVitepress` v0.3.5+ | Recommended use |
+  | --- | --- | --- |
+  | `@example` | ANSI output is rendered correctly | Evaluated examples without REPL formatting |
+  | `@repl` | Colored output is rendered correctly; input remains REPL-highlighted | Interactive examples, including colored `show` output |
+  | `@ansi` | Intended for examples whose terminal ANSI output is the focus | Explicit ANSI / terminal-output demonstrations |
 
-  - Use **`@example`** when the output comes from a `show` method that emits ANSI colors.
-  - Use **`@repl`** only when the output is a plain scalar value with no custom colored `show` (integers, booleans, symbols, plain strings, tuples of symbols, types).
-  - Use **`@repl`** + `try/catch # hide` + `showerror(IOContext(stdout, :color => false), e) # hide` to display exceptions — the `showerror` call produces plain text that renders cleanly inside a `julia`-fenced block:
+  For **v0.3.5 and later**:
+
+  - Use **`@repl`** for interactive examples, including values displayed by a custom ANSI-colored `show` method.
+  - Use **`@example`** when the example is better represented as a regular evaluated example; no change is needed when its output already renders correctly.
+  - Use **`@ansi`** when the example explicitly demonstrates terminal styling or raw ANSI output.
+  - Use **`@repl`** + `try/catch # hide` + `showerror(IOContext(stdout, :color => false), e) # hide` for exceptions when a stable, colorless error message is desired. This is a presentation choice, not a workaround required by v0.3.5+:
 
     ```julia
     try
@@ -257,7 +261,7 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
     end # hide
     ```
 
-  This is a known limitation tracked in [LuxDL/DocumenterVitepress.jl#321](https://github.com/LuxDL/DocumenterVitepress.jl/issues/321).
+  For **versions before v0.3.5**, use `@example` or `@ansi` for colored output, or disable colors explicitly as above. The old limitation was tracked in [LuxDL/DocumenterVitepress.jl#321](https://github.com/LuxDL/DocumenterVitepress.jl/issues/321).
 
 - **Color-aware display functions**: If your package has custom display functions that emit ANSI escape codes (e.g. error formatting helpers), make them color-aware by checking `get(io, :color, false)` before applying escape sequences:
 
