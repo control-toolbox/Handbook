@@ -329,6 +329,46 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
 - **Vitepress configuration**: The `REPLACE_ME_DOCUMENTER_VITEPRESS` strings are automatically replaced during the build
 - **TypeScript errors**: TypeScript errors in the IDE regarding `sidebar` and missing `node_modules` are normal before `npm install` — DocumenterVitepress replaces these values during the build
 
+## Presenting code
+
+VitePress gives fenced code blocks a set of annotations Documenter's Markdown does not. They
+render through DocumenterVitepress and are worth using where they make a snippet read better.
+
+| Feature | Syntax (trailing comment on the line, or on the fence) | Renders |
+| --- | --- | --- |
+| diff add / remove | `# [!code ++]` / `# [!code --]` | green / red gutter with `+` / `-` |
+| error line | `# [!code error]` | red-tinted line |
+| warning line | `# [!code warning]` | amber-tinted line |
+| highlight | `# [!code highlight]`, or `` ```julia {2,5-7} `` on the fence | tinted background |
+| focus | `# [!code focus]` | dims the rest, reveals on hover |
+| line numbers | `` ```julia:line-numbers `` | gutter numbering |
+| code group | `::: code-group` … `:::` around several fences | tabbed switcher |
+
+The `[!code …]` token is stripped from the rendered comment, so it can sit after real text:
+`# paired keywords  [!code ++]` renders as `# paired keywords` on a line marked added.
+
+**Hard constraint — static fences only.** These annotations are reliable only in
+non-executed ```` ```julia ```` / ```` ```julia-repl ```` / ```` ```text ```` fences.
+There is no support for them inside executed `@example` / `@repl` / `@setup` blocks (the
+CSP + transform path drops them). Never annotate a build-verified example. They do work
+inside `!!! note` / `!!! warning` admonitions (verified: OptimalControl.jl `migration.md`).
+
+**Before/after — collapse the pair.** A "write this instead of that" shown as two blocks
+becomes one:
+
+````markdown
+```julia
+f(t0, x0, tf, λ)                    # [!code --]
+f(t0, x0, tf; variable=λ)           # [!code ++]
+```
+````
+
+**Do not use a code group for a correspondence pair.** A `::: code-group` is a tabbed
+switcher — the reader sees one block at a time. That fits genuine *either/or* alternatives
+(`using Plots` vs `using CairoMakie`), never a pair whose point is the line-to-line mapping
+(a DSL macro shown next to the function calls it expands to, a before/after). Keep those
+stacked and both visible, with the prose that ties them together.
+
 ## Canonical api_reference.jl structure
 
 > This section is independent of the Vitepress migration. It documents the evolved
