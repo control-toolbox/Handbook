@@ -284,22 +284,29 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
 
   PNG wins by default. This is the **opposite** of `Documenter.HTML`, which prefers SVG.
 
-  - **CairoMakie** — produces SVG automatically because its figures do not respond to
-    `MIME"image/png"`. No action needed.
+  **Both `Plots.jl` and `CairoMakie` respond to `image/png`**, so PNG wins for every figure
+  unless you disable PNG capture. Do it once, globally, in `make.jl` — before any `@example`
+  block runs, so it covers every page present and future (`Base.showable` is a method on the
+  figure type):
 
-  - **Plots.jl** — responds to both MIME types, so DocumenterVitepress picks PNG.
-    To get vector-quality SVG, disable PNG capture in your `@setup` block:
+  ```julia
+  using Plots
+  import CairoMakie   # `import`, not `using`: `using` pulls Makie's `plot` / `plot!` into
+                      # Main, colliding with Plots' and breaking any bare-`plot` `@docs` block
+  Base.showable(::MIME"image/png", ::Plots.Plot) = false
+  CairoMakie.activate!(; type = "svg")
+  Base.showable(::MIME"image/png", ::CairoMakie.Makie.Figure) = false
+  ```
 
-    ````julia
-    ```@setup myblock
-    using Plots
-    Base.showable(::MIME"image/png", ::Plots.Plot) = false
-    ```
-    ````
+  DocumenterVitepress then falls back to `image/svg+xml` and saves each figure as a separate
+  `.svg` file (referenced via `![](filename.svg)`). Plots' GR backend and CairoMakie both
+  emit standalone SVG with the `xmlns` attribute, which is what DocumenterVitepress needs.
 
-    This makes DocumenterVitepress fall back to `image/svg+xml`. The GR backend includes
-    `xmlns` in its SVG output, so DocumenterVitepress saves it as a separate `.svg` file
-    (referenced via `![](filename.svg)`).
+  If you only plot on a few pages, the `Base.showable` line can instead go in a per-page
+  `@setup` block — but the global form is simpler and does not have to be repeated.
+
+  Older guidance said CairoMakie "produces SVG automatically, no action needed" — that is
+  **not true** with current CairoMakie (0.15): it responds to `image/png` like Plots does.
 
   Note: `Plots.default(fmt=:svg)` has **no effect** on MIME type selection — it only
   controls the format used when Plots saves to a file path, not how Documenter captures
@@ -328,6 +335,46 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
   DocumenterVitepress handles versions differently, without using symlinks.
 - **Vitepress configuration**: The `REPLACE_ME_DOCUMENTER_VITEPRESS` strings are automatically replaced during the build
 - **TypeScript errors**: TypeScript errors in the IDE regarding `sidebar` and missing `node_modules` are normal before `npm install` — DocumenterVitepress replaces these values during the build
+
+## Presenting code
+
+VitePress gives fenced code blocks a set of annotations Documenter's Markdown does not. They
+render through DocumenterVitepress and are worth using where they make a snippet read better.
+
+| Feature | Syntax (trailing comment on the line, or on the fence) | Renders |
+| --- | --- | --- |
+| diff add / remove | `# [!code ++]` / `# [!code --]` | green / red gutter with `+` / `-` |
+| error line | `# [!code error]` | red-tinted line |
+| warning line | `# [!code warning]` | amber-tinted line |
+| highlight | `# [!code highlight]`, or `` ```julia {2,5-7} `` on the fence | tinted background |
+| focus | `# [!code focus]` | dims the rest, reveals on hover |
+| line numbers | `` ```julia:line-numbers `` | gutter numbering |
+| code group | `::: code-group` … `:::` around several fences | tabbed switcher |
+
+The `[!code …]` token is stripped from the rendered comment, so it can sit after real text:
+`# paired keywords  [!code ++]` renders as `# paired keywords` on a line marked added.
+
+**Hard constraint — static fences only.** These annotations are reliable only in
+non-executed ```` ```julia ```` / ```` ```julia-repl ```` / ```` ```text ```` fences.
+There is no support for them inside executed `@example` / `@repl` / `@setup` blocks (the
+CSP + transform path drops them). Never annotate a build-verified example. They do work
+inside `!!! note` / `!!! warning` admonitions (verified: OptimalControl.jl `migration.md`).
+
+**Before/after — collapse the pair.** A "write this instead of that" shown as two blocks
+becomes one:
+
+````markdown
+```julia
+f(t0, x0, tf, λ)                    # [!code --]
+f(t0, x0, tf; variable=λ)           # [!code ++]
+```
+````
+
+**Do not use a code group for a correspondence pair.** A `::: code-group` is a tabbed
+switcher — the reader sees one block at a time. That fits genuine *either/or* alternatives
+(`using Plots` vs `using CairoMakie`), never a pair whose point is the line-to-line mapping
+(a DSL macro shown next to the function calls it expands to, a before/after). Keep those
+stacked and both visible, with the prose that ties them together.
 
 ## Canonical api_reference.jl structure
 
