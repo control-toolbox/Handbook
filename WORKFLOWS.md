@@ -151,9 +151,9 @@ events the job actually needs.
 | Label | Triggers | Used in |
 | --- | --- | --- |
 | `run ci` | CI test matrix (single job) | most packages |
-| `github-runner` | CI on GitHub-hosted runners | packages with split CI: OptimalControl, CTFlows.jl, CTParser.jl, CTSolvers (CTLie planned) |
-| `kkt-runner` | CI on the self-hosted `kkt` GPU runner | packages with split CI: OptimalControl, CTFlows.jl, CTParser.jl, CTSolvers (CTLie planned) |
-| `occidata-runner` | CI on the self-hosted `occidata` GPU runner | packages with heavier GPU workloads: CTFlows.jl (CTLie planned) |
+| `github-runner` | CI on GitHub-hosted runners | packages with split CI: OptimalControl, CTParser.jl, CTDirect.jl, CTFlows.jl, CTSolvers, CTLie |
+| `kkt-runner` | **Retired** — `kkt` is no longer a registered self-hosted runner in the org at all (`gh api orgs/control-toolbox/actions/runners` lists only `occidata-runner` and `pinwheel`). No `CI.yml` in the fleet defines a job for it any more. The label survives only as an unused leftover in OptimalControl, CTFlows.jl and CTLie — delete it there rather than reuse it. | none |
+| `occidata-runner` | CI on the self-hosted `occidata` GPU runner — the fleet's sole self-hosted CUDA CI target now that `kkt` is retired | every package with GPU-relevant code: OptimalControl, CTParser.jl, CTDirect.jl, CTFlows.jl, CTSolvers, CTLie |
 | `run GPU` | dedicated GPU test job | CTDirect (older, pre-split-CI pattern — not up to date, see §3.3) |
 | `run breakage` | breakage tests against downstream **packages** | core packages |
 | `run breakage applications` | breakage against downstream **applications/tutorials** | OptimalControl |
@@ -161,16 +161,17 @@ events the job actually needs.
 | `run probe` | standalone capability-probe scripts (see `CPUProbe.yml`/`GPUProbe.yml`, §3.3) | CTFlows.jl |
 
 **Split-CI labels are named after the *runner*, not the workload.** The two halves of a
-split `CI.yml` (§3.1) are gated by **`github-runner`** and **`kkt-runner`** — not by the
-older `run ci cpu` / `run ci gpu`, which are deprecated and must be renamed wherever they
-still exist. The runner-based naming is the accurate one: the GitHub-hosted job is not
+split `CI.yml` (§3.1) are gated by **`github-runner`** and **`occidata-runner`** — not by
+the older `run ci cpu` / `run ci gpu`, which are deprecated and must be renamed wherever
+they still exist. The runner-based naming is the accurate one: the GitHub-hosted job is not
 meaningfully "the CPU job", it is the job that runs on GitHub's runners (and happens to
-exercise CPU paths); the other job is defined by the self-hosted machine it lands on
-(`kkt`). Naming the label after the runner also keeps the label, the `runs_on` value and
-the job name saying the same thing, and it extends by construction to a future runner
-(`<name>-runner`) without inventing a new workload adjective — `occidata-runner`
-(added to CTFlows.jl on 2026-08-24) is exactly that extension in practice, a second
-self-hosted GPU box alongside `kkt` for heavier GPU workloads.
+exercise CPU paths); the other job is defined by the self-hosted machine it lands on. Naming
+the label after the runner also keeps the label, the `runs_on` value and the job name saying
+the same thing, and it extends by construction to a future runner (`<name>-runner`) without
+inventing a new workload adjective — that is exactly how `occidata-runner` itself started
+(added to CTFlows.jl on 2026-08-24, when it was a *second* self-hosted GPU box alongside
+`kkt` for heavier GPU workloads specifically). `kkt-runner` was the first label this
+convention produced and is now the retired one — the convention outlives any one runner.
 
 **This vocabulary is fleet-wide, not a per-repo choice.** Labels are the user-facing
 trigger surface: someone applying a label from muscle memory in a sibling repo, or
@@ -194,9 +195,9 @@ few **non-centralized / special** workflows (defined directly in a package).
 
 | Reusable (`CTActions`) | Caller name | Role | Typical trigger | Key inputs / secrets | PR label gate |
 | --- | --- | --- | --- | --- | --- |
-| `ci.yml` | `CI.yml` | Build + run the test suite over a Julia × OS × arch matrix | `push`, `tag`, PR | `versions`, `runs_on`, `archs`, `runner_type`, `use_ct_registry`; `SSH_KEY` | `run ci` (or `github-runner` / `kkt-runner` when split, see below) |
+| `ci.yml` | `CI.yml` | Build + run the test suite over a Julia × OS × arch matrix | `push`, `tag`, PR | `versions`, `runs_on`, `archs`, `runner_type`, `use_ct_registry`; `SSH_KEY` | `run ci` (or `github-runner` / `occidata-runner` when split, see below) |
 | `coverage.yml` | `Coverage.yml` | Run tests with coverage, upload to Codecov | `push`/`tag` to `main` | `use_ct_registry`; `codecov-secret`, `SSH_KEY` | — (push only) |
-| `documentation.yml` | `Documentation.yml` | Build & deploy the Documenter site | `push`, `tag`, PR | `use_ct_registry`; `SSH_KEY`, `DOCUMENTER_KEY` | `run documentation` |
+| `documentation.yml` | `Documentation.yml` | Build & deploy the Documenter site; optionally a `build-gpu` upgrade pass that redeploys with real GPU output once `build` has already published | `push`, `tag`, PR | `use_ct_registry`, `gpu_runner`, `gpu_timeout_minutes`; `SSH_KEY`, `DOCUMENTER_KEY` | `run documentation` |
 | `breakage.yml` | `Breakage.yml` | Test that a change doesn't break downstream packages/apps (`latest`/`stable`); comment a result table on the PR | PR (labeled) | `pkgname`, `pkgpath`, `pkgversion`, `pkgbreak` (`test`/`doc`), `use_ct_registry`; `SSH_KEY` | `run breakage` |
 | `formatter.yml` | `Formatter.yml` | Run JuliaFormatter (BlueStyle), open an auto PR | scheduled (nightly), `workflow_dispatch` | — | — |
 | `spell-check.yml` | `SpellCheck.yml` | Spell-check with `crate-ci/typos` | PR, `workflow_dispatch` | `locale`, `extend-identifiers`, `config-path` | — |
@@ -205,22 +206,49 @@ few **non-centralized / special** workflows (defined directly in a package).
 | `auto-assign.yml` | `AutoAssign.yml` | Auto-assign new issues/PRs to a maintainer | issue/PR opened | `assignees`, `numOfAssignee` | — |
 | `add-to-project.yml` | `AddToProject.yml` | Add new issues/PRs to the org project board (set Status) | issue/PR opened | `project-url`, `status`; `project_token` | — |
 
-**The `ci.yml` caller can be a single job, split in two, or split in three.** A package
-that needs GPU tests calls `ci.yml` twice (or three times) from its `CI.yml`: once as a
-GitHub-hosted job (`runs_on` an array of GitHub-hosted labels, gated by `github-runner`),
-once as a `self-hosted` GPU job on `kkt` (`runs_on: '[["kkt"]]'`, gated by `kkt-runner`),
-and — for packages with heavier GPU workloads — a second `self-hosted` GPU job on
+**The `ci.yml` caller can be a single job, or split in two.** A package that needs GPU
+tests calls `ci.yml` twice from its `CI.yml`: once as a GitHub-hosted job (`runs_on` an array
+of GitHub-hosted labels, gated by `github-runner`), once as a `self-hosted` GPU job on
 `occidata` (`runs_on: '[["occidata"]]'`, gated by `occidata-runner`). This is not an
-OptimalControl-specific quirk — `CTFlows.jl`, `CTParser.jl` and `CTSolvers` already use
-the two-way split, `CTFlows.jl` has since added the third `occidata` job, and `CTLie` is
-expected to move to it too, wherever the package has GPU-dependent code to test. A
-package with no GPU-relevant code (`CTModels.jl`, `CTLie` for now) keeps the single
-`call` job gated by plain `run ci`.
+OptimalControl-specific quirk — `CTParser.jl`, `CTDirect.jl`, `CTFlows.jl`, `CTSolvers` and
+`CTLie` all use the same two-way split; every package with GPU-relevant code now does. A
+package with no GPU-relevant code (`CTModels.jl`, `CTBase`) keeps the single `call` job
+gated by plain `run ci`.
+
+**`kkt` is fully retired — a three-way split (`github` + `kkt` + `occidata`) does not
+currently exist anywhere.** Earlier drafts of this document described `kkt` as a live target
+and CTFlows.jl as running a three-way split; the fleet moved past both. `kkt` is no longer
+even a registered runner in the org (confirmed via
+`gh api orgs/control-toolbox/actions/runners`, 2026-09-02) — only `occidata-runner` and
+`pinwheel` are — and no `CI.yml` in the fleet still calls it.
+
+**A third self-hosted GPU box, `pinwheel`, exists and is currently unused by any
+workflow.** Discovered 2026-09-02 while probing `occidata` for
+control-toolbox/OptimalControl.jl#885: `pinwheel` is **AMD**
+(`labels: self-hosted, Linux, X64, gpu, amdgpu, pinwheel`), not CUDA like `occidata`. It is
+not a candidate for any `:gpu` CI in this ecosystem today — the GPU stack everywhere
+(`ExaModels` → `MadNLPGPU` → `CUDSS`) is CUDA-only. Worth its own maintenance workflow and
+a row in §3.1/§3.2 once something actually targets it; recorded here so nobody discovers it
+by accident and points a CUDA job at it.
 
 > `CTParser.jl` belongs in the split group: its `test/Project.toml` depends on `CUDA`,
 > `MadNLPGPU`, `KernelAbstractions` and `ExaModels`, `test/runtests.jl` loads them
 > unconditionally, and `src/onepass.jl` carries the ExaModels backend with explicit GPU
 > array conversions.
+
+**`documentation.yml` can carry the same split, but shaped differently: publish then
+upgrade, not attempt-then-fallback.** OptimalControl.jl is the first caller to opt in
+(`gpu_runner: '["occidata"]'`, CTActions#71, for control-toolbox/OptimalControl.jl#885 part
+2). The existing GitHub-hosted `build` job is untouched and always runs first, deploying
+exactly as before; a second job, `build-gpu`, runs only once `build` has already published
+(`needs: build`) and, with `continue-on-error: true`, can never fail the workflow — on
+success it redeploys the same site with real GPU output, on failure or a long SLURM queue it
+simply leaves the already-published site in place. This shape exists because, unlike
+`ci.yml`, a documentation build's job both builds *and* deploys (`deploydocs` runs inside
+`docs/make.jl`), so there is no way to "attempt GPU, fall back to CPU" within a single job —
+and putting a self-hosted box on the critical path of *publishing* is a reliability
+regression `ci.yml`'s split never risked. Any caller that wants GPU-backed docs numbers
+should follow this pattern, not the `ci.yml` one.
 
 ### 3.2 Maintenance workflows that live *in* `CTActions` (not called)
 
@@ -233,8 +261,14 @@ healthy. They are not `workflow_call` reusables.
 | `remove-julia.yml` | Wipe stale Julia installs on a self-hosted runner | weekly cron, `workflow_dispatch` |
 
 `occidata` started as the target of this maintenance workflow only; since CTFlows.jl's
-`occidata-runner` job (§3.1, added 2026-08-24) it is also a live GPU CI target for
-package test matrices, not just a runner kept healthy for its own sake.
+`occidata-runner` job (§3.1, added 2026-08-24) it is also a live GPU CI target for every
+package's test matrix that needs one, and (2026-09-02, control-toolbox/OptimalControl.jl#885)
+a documentation-build target too — not just a runner kept healthy for its own sake. Two
+quirks of the node worth knowing for either role: the node's `/tmp` is wiped every hour at
+`HH:01` (`ci.yml`'s `TMPDIR` redirect on self-hosted jobs works around this, commit 2f00b67 —
+any long-running job, docs builds included, needs the same), and this workflow's own Monday
+02:30 UTC purge of the compiled-code cache means the *first* job after it runs cold. A job
+landing right after either is slower or needs a retry — not a sign the runner is unhealthy.
 
 ### 3.3 Non-centralized / per-repo special workflows
 
@@ -260,15 +294,15 @@ Two workflows are **conditional**: `Breakage` and `AddToProject`.
 | CTAppTemplate.jl | ✅ | — | — | `setup-repo` |
 | CTBase | ✅ | ✅ | ✅ | — |
 | CTModels.jl | ✅ | ✅ | ✅ | — |
-| CTParser.jl | ✅ | ✅ | ✅ | split CI (`github-runner`/`kkt-runner`) |
-| CTFlows.jl | ✅ | ✅ | — | split CI (`github-runner`/`kkt-runner`), `CPUProbe`/`GPUProbe` (`run probe`) |
-| CTDirect.jl | ✅ | ✅ | ✅ | `GPU`, `Formatter` disabled — **stale**, not currently kept up to date with the rest of the fleet |
-| CTSolvers | ✅ | ✅ | ✅ | split CI (`github-runner`/`kkt-runner`) |
-| OptimalControl | ✅ | ✅ | ✅ | `JOSS`, split CI (`github-runner`/`kkt-runner`) |
+| CTParser.jl | ✅ | ✅ | ✅ | split CI (`github-runner`/`occidata-runner`) |
+| CTFlows.jl | ✅ | ✅ | — | split CI (`github-runner`/`occidata-runner`), `CPUProbe`/`GPUProbe` (`run probe`) |
+| CTDirect.jl | ✅ | ✅ | ✅ | split CI (`github-runner`/`occidata-runner`, replacing the older dedicated `GPU.yml`); `Formatter` disabled — **stale**, not currently kept up to date with the rest of the fleet |
+| CTSolvers | ✅ | ✅ | ✅ | split CI (`github-runner`/`occidata-runner`) |
+| OptimalControl | ✅ | ✅ | ✅ | `JOSS`, split CI (`github-runner`/`occidata-runner`); `Documentation` also carries an optional `build-gpu` upgrade pass on `occidata` (2026-09-02, control-toolbox/OptimalControl.jl#885) |
 | OptimalControlProblems | ✅ | — | — | — |
 | CTDiffFlow.jl | ✅ | — | — | — |
 | CTBenchmarks.jl | ✅ | — | — | `benchmark-*` |
-| CTLie | ✅ (no `AddToProject`) | ✅ (vs. `OptimalControl`) | — | new repo (2026); single `run ci` job so far, split CI (`github-runner`/`kkt-runner`/`occidata-runner`) planned |
+| CTLie | ✅ (no `AddToProject`) | ✅ (vs. `OptimalControl`) | — | split CI (`github-runner`/`occidata-runner`) |
 
 **Why `Breakage` is present only in some repos.** Breakage answers: *"if I change this
 package, do its downstream consumers still build/test?"* It only makes sense for a
@@ -317,13 +351,11 @@ building. Set `use_ct_registry: false` for packages that only need the General r
 `ci.yml` accepts `runner_type: github | self-hosted` and a `runs_on` value (a single
 label string or a JSON array of labels). GitHub-hosted runners use
 `julia-actions/cache`; self-hosted runners use manual artifact/compiled-code caches.
-`OptimalControl`, `CTFlows.jl`, `CTParser.jl` and `CTSolvers` demonstrate the split (any
-package with GPU-dependent code to test): a `github` job (`github-runner`) and a
-`self-hosted` GPU job on the `kkt` runner (`kkt-runner`) — the labels are named after
-the runner, see §2. `CTFlows.jl` also runs a second `self-hosted` GPU job on the
-`occidata` runner (`occidata-runner`) for heavier GPU workloads. `CTLie` is expected to
-adopt the same split as it grows. The self-hosted runners are the ones maintained by
-the scheduled `CTActions` maintenance workflows (§3.2).
+`OptimalControl`, `CTParser.jl`, `CTDirect.jl`, `CTFlows.jl`, `CTSolvers` and `CTLie` all
+demonstrate the split (any package with GPU-dependent code to test): a `github` job
+(`github-runner`) and a `self-hosted` GPU job on the `occidata` runner
+(`occidata-runner`) — the labels are named after the runner, see §2. The self-hosted
+runner is the one maintained by the scheduled `CTActions` maintenance workflows (§3.2).
 
 ### Secrets used across the pipeline
 
@@ -358,15 +390,16 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
    `use_ct_registry` in `CI.yml`. Set `use_ct_registry: true` if the package needs
    `ct-registry`.
 7. **Decide on a runner split.** If the package has GPU-dependent code to test, split
-   `CI.yml` into a `github` job (`github-runner`) and a `self-hosted` GPU job on `kkt`
-   (`kkt-runner`) instead of a single `run ci` job — see §3.1 and
-   `CTFlows.jl`/`CTParser.jl`/`CTSolvers` for the current pattern (not `CTDirect.jl`'s
-   older `GPU.yml`, which predates it). For heavier GPU workloads, add a third job on
-   the `occidata` runner (`occidata-runner`) — see `CTFlows.jl`. Use those label names
-   verbatim; the former `run ci cpu` / `run ci gpu` spelling is deprecated (§2).
+   `CI.yml` into a `github` job (`github-runner`) and a `self-hosted` GPU job on the
+   `occidata` runner (`occidata-runner`) instead of a single `run ci` job — see §3.1
+   and `CTParser.jl`/`CTDirect.jl`/`CTFlows.jl`/`CTSolvers`/`CTLie` for the current
+   pattern, all identical. There is no third job and no `kkt` runner any more — `kkt`
+   is retired (§2), and `CTDirect.jl`'s older, separate `GPU.yml` has been replaced by
+   this same split, not kept alongside it. Use the label names verbatim; the former
+   `run ci cpu` / `run ci gpu` spelling is deprecated (§2).
 8. **Create the trigger labels** you reference (`run ci`, `run breakage`, `run
-   documentation`, `github-runner`/`kkt-runner`/`occidata-runner` when split, …) in the
-   repo's label set.
+   documentation`, `github-runner`/`occidata-runner` when split, …) in the repo's
+   label set.
 9. **Configure secrets** in the repo (or org): `SSH_KEY`, `DOCUMENTER_KEY`,
    `CODECOV_TOKEN`, `PROJECT_TOKEN` as needed by the workflows you kept.
 10. **Provide `UpdateReadme` inputs.** Add a `README.template.md` and fill
@@ -408,8 +441,8 @@ the caller's whole secret set; otherwise pass secrets explicitly, one by one.
 - [ ] `Breakage.yml` added **iff** the repo has internal downstream consumers; matrix filled.
 - [ ] `AddToProject.yml` added **iff** tracked on the project board (`PROJECT_TOKEN` set).
 - [ ] CI inputs set (`versions`, `runs_on` — include `windows-latest`, `use_ct_registry`).
-- [ ] Runner split decided (`github-runner` + `kkt-runner` jobs, plus `occidata-runner` for heavier GPU workloads) **iff** the package has GPU-dependent code to test.
-- [ ] Trigger labels created for every label-gated caller (`run …`, plus `github-runner`/`kkt-runner`/`occidata-runner` when split).
+- [ ] Runner split decided (`github-runner` + `occidata-runner` jobs) **iff** the package has GPU-dependent code to test.
+- [ ] Trigger labels created for every label-gated caller (`run …`, plus `github-runner`/`occidata-runner` when split).
 - [ ] Every label-gated caller uses `types: [labeled, synchronize, reopened]` — **no `opened`**
       (it duplicates the `labeled` run when a PR is created with its label; see §2).
 - [ ] Secrets configured (`SSH_KEY`, `DOCUMENTER_KEY`, `CODECOV_TOKEN`, `PROJECT_TOKEN`).
