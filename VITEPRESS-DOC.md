@@ -312,6 +312,63 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
   controls the format used when Plots saves to a file path, not how Documenter captures
   the result.
 
+- **Downloadable non-image assets (`Manifest.toml`, data files, archives)**: VitePress only
+  emits assets it recognises — images, fonts, media. A `.toml` (or `.csv`, `.zip`, …)
+  referenced from a **Markdown link** is silently dropped from `docs/build/1/` and the link
+  404s. A page kept on `Documenter.HTML` (which copies `docs/src/assets/` wholesale) still
+  serves such files; the same page 404s once migrated to DocumenterVitepress, with no build
+  warning.
+
+  Serve the file from `docs/src/public/`, which VitePress copies verbatim to the site root.
+  Copy it there in `make.jl`, and *also* into `docs/src/assets/` so Documenter's link checker
+  resolves the `assets/…` link (there is no `warnonly` to fall back on):
+
+  ```julia
+  # docs/make.jl — before makedocs
+  mkpath(joinpath(@__DIR__, "src", "assets"))
+  mkpath(joinpath(@__DIR__, "src", "public", "assets"))
+  for f in ("Manifest.toml", "Project.toml")
+      cp(joinpath(@__DIR__, f), joinpath(@__DIR__, "src", "assets", f); force=true)
+      cp(joinpath(@__DIR__, f), joinpath(@__DIR__, "src", "public", "assets", f); force=true)
+  end
+  ```
+
+  The Markdown link stays relative — `[Manifest.toml](assets/Manifest.toml)` — so the `base`
+  path is resolved at deploy time.
+
+  **Side effect**: creating `docs/src/public/` makes DocumenterVitepress **skip its
+  `docs/src/assets/ → public/` copy of `logo.*` and `favicon.*`** — that copy is guarded by
+  `!isdir(src/public)`. Stage the logo into `docs/src/public/` in `make.jl` too, or the
+  navbar logo disappears:
+
+  ```julia
+  cp(joinpath(@__DIR__, "src", "assets", "logo.svg"),
+     joinpath(@__DIR__, "src", "public", "logo.svg"); force=true)
+  ```
+
+  `.gitignore` `docs/src/public/` — it is build output; keep the tracked
+  `docs/src/assets/Manifest.toml` as the reviewable snapshot.
+
+- **Local Markdown images render with an empty `alt`**: DocumenterVitepress renders every
+  *local* `![alt](file)` image — captured `@example` plot output and hand-written content
+  images alike — as `<img src="…" alt="">`, discarding the alt text. It is kept only for
+  remote `![alt](https://…)` images and for `<img alt="…">` written inside a `@raw html`
+  block. Consequence: a per-image CSS hook keyed on `img[alt=""]` (for example a dark-mode
+  `filter: invert(1)` on white-ground figures) catches **every** local image, not just plots.
+  An image that must be excluded has to be a `@raw html` `<img alt="…">`.
+
+- **`::: details` vs `!!! details`**: to get a collapsible block, write the VitePress
+  container **literally** in the Markdown — `@example` blocks inside it still execute:
+
+  ```markdown
+  ::: details Environment used to build this documentation
+  …
+  :::
+  ```
+
+  Documenter's `!!! details "…"` admonition does **not** produce one: DocumenterVitepress
+  maps every admonition category except `tip` / `warning` / `danger` / `caution` to `::: tip`.
+
 - **Git repository required**: DocumenterVitepress requires a git repository to function
 - **Build output**: Documentation is generated in `docs/build/1/` (not `docs/build/`)
 - **Do not create Vitepress files manually**: always use `generate_template` (step 4) — it generates all config, theme, components, and npm files
