@@ -369,6 +369,33 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
   Documenter's `!!! details "…"` admonition does **not** produce one: DocumenterVitepress
   maps every admonition category except `tip` / `warning` / `danger` / `caution` to `::: tip`.
 
+- **Theme-adaptive logo**: VitePress's `logo: { light, dark }` **double-renders in the
+  DocumenterVitepress navbar title** — both `<img>` show, because VitePress's component-scoped
+  `.VPImage.light` / `.VPImage.dark` toggle CSS does not reach that markup. For the navbar,
+  keep the single `logo:` (a light SVG) and recolour it in dark mode with a CSS filter in
+  `docs/src/.vitepress/theme/style.css`:
+
+  ```css
+  /* invert(a) maps white to 255·(1−a); a = 1 − 27/255 ≈ 0.894 lands it on the
+     VitePress dark surface #1b1b1f. hue-rotate(180deg) leaves that neutral grey
+     untouched and rotates coloured marks back toward their hue (approximately). */
+  .dark .VPNavBarTitle .VPImage { filter: invert(0.894) hue-rotate(180deg); }
+  ```
+
+  For an in-page hero logo where the ~10% desaturation of the filter is visible, ship an
+  actual dark SVG (generate it in `make.jl` by swapping `#ffffff` → `#1b1b1f`) and swap the
+  two `<img>` with your **own** classes, not VitePress's:
+
+  ```html
+  <img src="./assets/logo.svg"      class="oc-logo oc-logo--light" />
+  <img src="./assets/logo-dark.svg" class="oc-logo oc-logo--dark" />
+  <style>
+  .oc-logo--dark { display: none; }
+  .dark .oc-logo--light { display: none; }
+  .dark .oc-logo--dark  { display: block; }
+  </style>
+  ```
+
 - **Git repository required**: DocumenterVitepress requires a git repository to function
 - **Build output**: Documentation is generated in `docs/build/1/` (not `docs/build/`)
 - **Do not create Vitepress files manually**: always use `generate_template` (step 4) — it generates all config, theme, components, and npm files
