@@ -54,6 +54,20 @@ Why this design:
 Callers always reference the reusable workflow by its full path **pinned to `@main`**:
 `control-toolbox/CTActions/.github/workflows/<name>.yml@main`.
 
+### AI agents: define, centralize, then call
+
+The same separation applies to AI agents:
+
+- persistent agent instructions live in [`ai-agents/`](ai-agents/), one Markdown file per agent;
+- execution logic lives in the reusable [`ai-agent.yml`](https://github.com/control-toolbox/CTActions/blob/main/.github/workflows/ai-agent.yml) workflow in `CTActions`;
+- packages provide thin caller workflows and pass a concrete `task` for each run.
+
+See [`ai-agents/README.md`](ai-agents/README.md) for the agent format, runtime
+context, secret-safety rules, and an example caller.
+
+The agent file is the system instruction set. The caller's `task` is the user
+request for the current run; it is passed separately to the selected provider.
+
 ---
 
 ## 2. The second idea: label-gated triggers
@@ -199,7 +213,8 @@ few **non-centralized / special** workflows (defined directly in a package).
 | `coverage.yml` | `Coverage.yml` | Run tests with coverage, upload to Codecov | `push`/`tag` to `main` | `use_ct_registry`; `codecov-secret`, `SSH_KEY` | — (push only) |
 | `documentation.yml` | `Documentation.yml` | Build & deploy the Documenter site; optionally a `build-gpu` upgrade pass that redeploys with real GPU output once `build` has already published | `push`, `tag`, PR | `use_ct_registry`, `gpu_runner`, `gpu_timeout_minutes`; `SSH_KEY`, `DOCUMENTER_KEY` | `run documentation` |
 | `breakage.yml` | `Breakage.yml` | Test that a change doesn't break downstream packages/apps (`latest`/`stable`); comment a result table on the PR | PR (labeled) | `pkgname`, `pkgpath`, `pkgversion`, `pkgbreak` (`test`/`doc`), `use_ct_registry`; `SSH_KEY` | `run breakage` |
-| `formatter.yml` | `Formatter.yml` | Run JuliaFormatter (BlueStyle), open an auto PR | scheduled (nightly), `workflow_dispatch` | — | — |
+| `ai-agent.yml` | `AI*.yml` | Run a Handbook-defined AI agent with a selected provider, model, and task | `workflow_dispatch` or package-defined trigger | `provider`, `handbook_ref`, `agent_name`, `model`, `task`; `ALBERT_API_KEY`, `HANDBOOK_READ_TOKEN` | — |
+| `formatter.yml` | `Formatter.yml` | Run JuliaFormatter (BlueStyle) and open an auto PR | scheduled (nightly), `workflow_dispatch` | — | — |
 | `spell-check.yml` | `SpellCheck.yml` | Spell-check with `crate-ci/typos` | PR, `workflow_dispatch` | `locale`, `extend-identifiers`, `config-path` | — |
 | `compat-helper.yml` | `CompatHelper.yml` | Open PRs bumping `[compat]` bounds | scheduled (daily), `workflow_dispatch` | `subdirs`; `GITHUB_TOKEN`, `DOCUMENTER_KEY` | — |
 | `update-readme.yml` | `UpdateReadme.yml` | Regenerate `README.md` from a template + the org's central `ABOUT/INSTALL/CONTRIBUTING.md` + badges | scheduled (weekly), `workflow_dispatch` | `template_file`, `output_file`, `package_name`, `repo_name`, `doc_url`, `citation_badge`, `assignee` | — |
