@@ -273,7 +273,6 @@ healthy. They are not `workflow_call` reusables.
 | Workflow (`CTActions`) | Role | Trigger |
 | --- | --- | --- |
 | `occidata-runner-maintenance.yml` | Purge Julia compile cache, update TeXLive, rotate logs on the `occidata` self-hosted runner | weekly cron, `workflow_dispatch` |
-| `remove-julia.yml` | Wipe stale Julia installs on a self-hosted runner | weekly cron, `workflow_dispatch` |
 
 `occidata` started as the target of this maintenance workflow only; since CTFlows.jl's
 `occidata-runner` job (§3.1, added 2026-08-24) it is also a live GPU CI target for every
