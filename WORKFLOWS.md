@@ -273,6 +273,7 @@ healthy. They are not `workflow_call` reusables.
 | Workflow (`CTActions`) | Role | Trigger |
 | --- | --- | --- |
 | `occidata-runner-maintenance.yml` | Purge Julia compile cache, update TeXLive, rotate logs on the `occidata` self-hosted runner | weekly cron, `workflow_dispatch` |
+| `occidata-runner-watchdog.yml` | Over SSH, run `scripts/start_runners.sh` (control-toolbox/occidata), which restarts every Occidata runner instance whose SLURM job is neither pending nor running | daily cron, `workflow_dispatch` |
 
 `occidata` started as the target of this maintenance workflow only; since CTFlows.jl's
 `occidata-runner` job (§3.1, added 2026-08-24) it is also a live GPU CI target for every
@@ -283,6 +284,33 @@ quirks of the node worth knowing for either role: the node's `/tmp` is wiped eve
 any long-running job, docs builds included, needs the same), and this workflow's own Monday
 02:30 UTC purge of the compiled-code cache means the *first* job after it runs cold. A job
 landing right after either is slower or needs a retry — not a sign the runner is unhealthy.
+
+**The `occidata` runner has no GPU of its own: it gets one on demand.** Since 2026-09-28 the
+runner idles in a CPU SLURM allocation (`24CPUNodes`) instead of holding a GTX 1080 Ti for
+7 days. A step that needs CUDA prefixes its command with `$OCCIDATA_GPU_RUN`, which the runner
+exports (control-toolbox/occidata, `scripts/slurm_gpu_run.sh`). That script submits the command
+to `GPUNodes` with `sbatch --wait` for the step's duration only. It keeps the step's
+environment (including `RUNNER_NAME`), streams its output, propagates its exit status, and
+cancels the SLURM job when the workflow is cancelled:
+
+```yaml
+- run: ${OCCIDATA_GPU_RUN:-} julia --project=... script.jl   # plain `julia ...` on any other runner
+```
+
+`ci.yml` (through `julia-runtest`'s `prefix`) and `documentation.yml`'s `build-gpu` already do
+this (CTActions#79), so their callers need nothing. **A workflow with its own steps must add
+the prefix itself** (like CTFlows.jl's `GPUProbe.yml`). Without it, the step runs on the CPU
+node, and the test suites' "`RUNNER_NAME` contains `occidata` ⇒ `CUDA.functional()` is
+required" contract fails. Resources can be tuned per step with `OCCIDATA_GPU_PARTITION`,
+`OCCIDATA_GPU_GRES`, `OCCIDATA_GPU_CPUS`, `OCCIDATA_GPU_MEM` and `OCCIDATA_GPU_TIME` (a bare
+number is read as minutes). The label `gpu` on the runner therefore means "can get a GPU", not
+"runs on one". Keep an eye on precompilation: it happens inside the prefixed command, that
+is, while the GPU is held.
+
+Occidata also hosts a second runner instance, `occidata-cpu`, for the `ocourses`
+organization. It runs in `cpu` mode: no `$OCCIDATA_GPU_RUN`, so no GPU ever. Instances,
+their modes and how to add one are documented in control-toolbox/occidata,
+`docs/gha-runner-config.md` § 9.
 
 ### 3.3 Non-centralized / per-repo special workflows
 
