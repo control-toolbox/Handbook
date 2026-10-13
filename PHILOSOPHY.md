@@ -44,7 +44,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
    `@inferred` for stability, `@ballocated` for allocation invariants — on the hot
    path only, never on one-time setup code.
    → [`types-traits-interfaces.md`](rules/types.md#typ8--type-stability-by-default),
-   [`performance.md`](philosophy/performance.md)
+   [`performance.md`](rules/performance.md)
 
 8. **Everything is documented.** A docstring on every symbol, fixed templates,
    cross-references `@ref`/`@extref`, safe and reproducible examples.
@@ -69,5 +69,5 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 | [`exceptions.md`](rules/exceptions.md) | The 7 exceptions and the choice rule |
 | [`docstrings.md`](philosophy/docstrings.md) | Docstring templates, cross-references, example safety |
 | [`testing.md`](philosophy/testing.md) | Categories, fakes/stubs, **module + callable function template** |
-| [`performance.md`](philosophy/performance.md) | Hot path vs. setup path, JET setup, `@inferred` + allocation guards |
+| [`performance.md`](rules/performance.md) | Hot path vs. setup path, JET setup, `@inferred` + allocation guards |
 | [`documentation.md`](philosophy/documentation.md) | API generation, guides, draft workflow |

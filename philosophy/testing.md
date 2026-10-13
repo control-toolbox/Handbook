@@ -168,7 +168,7 @@ Test.@test (BenchmarkTools.@ballocated SubA.accessor($obj)) == 0
 ```
 
 For the full methodology — JET setup, hot-path vs. setup-path classification, and
-the allocation-contract file — see [`performance.md`](performance.md).
+the allocation-contract file — see [`PERF5`](../rules/performance.md#perf5--an-allocation-contract-never-wall-clock-time).
 
 ## Checklist
 
