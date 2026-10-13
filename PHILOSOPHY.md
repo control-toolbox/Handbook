@@ -57,7 +57,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 
 10. **Auto-generated API docs, public *and* private; guides separate.** Users reach
     internals via qualified paths, so both are documented.
-    → [`documentation.md`](philosophy/documentation.md)
+    → [`documentation.md`](rules/site.md)
 
 ## Index
 
@@ -70,4 +70,4 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 | [`docstrings.md`](rules/docstrings.md) | Docstring templates, cross-references, example safety |
 | [`testing.md`](rules/testing.md) | Categories, fakes/stubs, **module + callable function template** |
 | [`performance.md`](rules/performance.md) | Hot path vs. setup path, JET setup, `@inferred` + allocation guards |
-| [`documentation.md`](philosophy/documentation.md) | API generation, guides, draft workflow |
+| [`documentation.md`](rules/site.md) | API generation, guides, draft workflow |

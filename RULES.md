@@ -117,7 +117,7 @@ step is needed.
 
 ### Local preview
 
-Depends on the backend (see [`philosophy/documentation.md`](philosophy/documentation.md)):
+Depends on the backend (see [`rules/site.md`](rules/site.md)):
 
 - **DocumenterVitepress** (current ecosystem standard): `npx serve docs/build/1 --listen 5173`
   or with LiveServer: `julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", single_page=true)'`

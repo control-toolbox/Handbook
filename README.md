@@ -64,7 +64,7 @@ examples stay generic (no package-specific symbols).
    safe examples. → `DOC1`–`DOC8`
 9. **Tests: module + callable function + everything qualified.** → `TST1`–`TST7`
 10. **Auto-generated API docs, public *and* private; guides separate.**
-    → `SITE1`–`SITE11`
+    → `SITE1`–`SITE13`
 
 ---
 
