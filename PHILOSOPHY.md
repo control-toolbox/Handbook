@@ -53,7 +53,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 9. **Tests: module + callable function + everything qualified.** Each test file is a
    module with an entry function redefined in the outer scope; fakes at module
    top-level; categories unit / integration / contract / error.
-   → [`testing.md`](philosophy/testing.md)
+   → [`testing.md`](rules/testing.md)
 
 10. **Auto-generated API docs, public *and* private; guides separate.** Users reach
     internals via qualified paths, so both are documented.
@@ -68,6 +68,6 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 | [`dimension-and-shape.md`](rules/dimension.md) | "1-D is a scalar" convention: state/control/variable shape, boundary rules, testing |
 | [`exceptions.md`](rules/exceptions.md) | The 7 exceptions and the choice rule |
 | [`docstrings.md`](philosophy/docstrings.md) | Docstring templates, cross-references, example safety |
-| [`testing.md`](philosophy/testing.md) | Categories, fakes/stubs, **module + callable function template** |
+| [`testing.md`](rules/testing.md) | Categories, fakes/stubs, **module + callable function template** |
 | [`performance.md`](rules/performance.md) | Hot path vs. setup path, JET setup, `@inferred` + allocation guards |
 | [`documentation.md`](philosophy/documentation.md) | API generation, guides, draft workflow |
