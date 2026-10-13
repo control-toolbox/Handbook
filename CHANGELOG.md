@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-13
+
 The Handbook becomes **ct-conventions**: coding conventions only, one identifier per
 rule. Everything else moves to the repository it describes.
 

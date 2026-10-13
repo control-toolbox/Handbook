@@ -6,7 +6,7 @@ sections, or rule changes that require existing packages to adapt. Each entry co
 with a migration block, as described in
 [`CHG3`](rules/changelog.md#chg3--breaking-entries-appear-in-both-files-with-a-migration-block).
 
-## Unreleased — the Handbook becomes ct-conventions
+## Version 0.2.0 — the Handbook becomes ct-conventions
 
 - **Rules carry identifiers** and live in `rules/`; cite them by identifier
   (`MOD3`, not "modules.md, `using` never `import`").
