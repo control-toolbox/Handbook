@@ -215,7 +215,7 @@ pulls `Sub`'s `export`s into scope unqualified, silently allowing calls the guid
 writes (e.g. bare `VectorField(...)` instead of `Data.VectorField(...)`); the
 `: Sub` form binds just the name, so every call still needs the qualified path. As
 everywhere else, `import` is not an option (see
-[`modules.md`](modules.md#using-never-import)).
+[`modules.md`](../rules/modules.md#mod3--no-import)).
 
 ```julia
 # ✅ short, qualified, no export leakage

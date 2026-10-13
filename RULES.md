@@ -180,7 +180,7 @@ On every build, **`tee`** the output to `/tmp/…` and filter (`grep -E
 - Never introduce an `import` in Julia code: dependencies come into scope with `using`
   only, and method extensions are written qualified (`Base.show(...)`, `Mod.f(...)`).
   Rule and translation table in
-  [`philosophy/modules.md`](philosophy/modules.md#using-never-import).
+  [`MOD3`](rules/modules.md#mod3--no-import).
 
 ---
 

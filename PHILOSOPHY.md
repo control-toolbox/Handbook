@@ -11,13 +11,13 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 
 1. **One module per responsibility.** Each submodule has a single role, its own
    directory, its own manifest. The package manifest exports **nothing**.
-   → [`modules.md`](philosophy/modules.md)
+   → [`modules.md`](rules/modules.md)
 
 2. **Everything is qualified — with `using`, never `import`.** Bring modules into
    scope, not their symbols (`using Pkg: Pkg`, `using Pkg: Sub`); call `Module.symbol`
    everywhere and extend methods qualified (`Base.show(...)`). Explicit origin, safe
    refactors, no shadowing.
-   → [`modules.md`](philosophy/modules.md#using-never-import)
+   → [`modules.md`](rules/modules.md#mod3--no-import)
 
 3. **One abstract type per *noun*, one trait-parameter per *adjective*.** Conceptual
    variants ("is it an X or a Y") are types; orthogonal axes (autonomous?, in-place?, …)
@@ -63,7 +63,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 
 | File | Content |
 | --- | --- |
-| [`modules.md`](philosophy/modules.md) | Submodule organization, imports/qualification, DAG, exports |
+| [`modules.md`](rules/modules.md) | Submodule organization, imports/qualification, DAG, exports |
 | [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md) | Types vs traits, interfaces/contracts, SOLID/DRY/YAGNI, type stability |
 | [`dimension-and-shape.md`](philosophy/dimension-and-shape.md) | "1-D is a scalar" convention: state/control/variable shape, boundary rules, testing |
 | [`exceptions.md`](philosophy/exceptions.md) | The 7 exceptions and the choice rule |
