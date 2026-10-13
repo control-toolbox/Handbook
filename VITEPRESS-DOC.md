@@ -369,6 +369,18 @@ julia --project=docs -e 'using LiveServer; LiveServer.serve(dir="docs/build/1", 
   Documenter's `!!! details "…"` admonition does **not** produce one: DocumenterVitepress
   maps every admonition category except `tip` / `warning` / `danger` / `caution` to `::: tip`.
 
+- **No logo / no favicon**: the generated `config.mts` contains two placeholders,
+  `logo: 'REPLACE_ME_DOCUMENTER_VITEPRESS'` (in `themeConfig`) and
+  `['link', { rel: 'icon', href: 'REPLACE_ME_DOCUMENTER_VITEPRESS_FAVICON' }]` (in `head`).
+  DocumenterVitepress fills them from `docs/src/assets/logo.{png,svg}` and
+  `docs/src/assets/favicon.ico`; when a file is missing it deletes the line from the built
+  config — the site renders without it — but emits a warning on **every** build
+  (`No logo.png file found…`, `No favicon.ico file found…`). A package that ships no logo
+  (the default for control-toolbox packages, whose favicon comes from the hosting site)
+  should **delete both lines from `docs/src/.vitepress/config.mts`**: the output is
+  identical and the warnings disappear. Keep them only if the matching file exists in
+  `docs/src/assets/`.
+
 - **Theme-adaptive logo**: VitePress's `logo: { light, dark }` **double-renders in the
   DocumenterVitepress navbar title** — both `<img>` show, because VitePress's component-scoped
   `.VPImage.light` / `.VPImage.dark` toggle CSS does not reach that markup. For the navbar,

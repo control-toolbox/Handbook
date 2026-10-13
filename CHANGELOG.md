@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 📚 Documentation
+
+- [`VITEPRESS-DOC.md`](VITEPRESS-DOC.md): new note on packages without a logo or favicon —
+  delete the two `REPLACE_ME_DOCUMENTER_VITEPRESS` placeholders (`logo:` and the `icon`
+  link) from `config.mts` to silence the DocumenterVitepress warnings; the output is
+  unchanged.
+
+### ✅ Compatibility
+
+- **No breaking changes**: a recommendation for new and existing packages; nothing to
+  migrate.
+
 ## [0.1.0] - 2026-10-13 — baseline
 
 This is the reference version. No changelog was maintained before this point;
