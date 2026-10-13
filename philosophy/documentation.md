@@ -2,7 +2,7 @@
 
 How docstrings become a published site via Documenter.jl and
 `CTBase.automatic_reference_documentation()`. Generic examples. Complements
-[`docstrings.md`](docstrings.md) (what to write *inside* docstrings).
+[`docstrings.md`](../rules/docstrings.md) (what to write *inside* docstrings).
 
 ## Principles
 
@@ -144,7 +144,7 @@ two self-contained patterns below).
 ### Self-reference for extensible generics
 
 A package whose shared generics get extended by downstream packages (see
-[`docstrings.md`](docstrings.md#self-reference-for-extensible-generics)) must register
+[`DOC5`](../rules/docstrings.md#doc5--self-reference-for-extensible-generics)) must register
 **itself** as an `InterLinks` target, so its own `@extref` cross-submodule references
 resolve both in its own build and when transcluded into a downstream package's docs:
 

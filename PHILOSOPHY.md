@@ -48,7 +48,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 
 8. **Everything is documented.** A docstring on every symbol, fixed templates,
    cross-references `@ref`/`@extref`, safe and reproducible examples.
-   → [`docstrings.md`](philosophy/docstrings.md)
+   → [`docstrings.md`](rules/docstrings.md)
 
 9. **Tests: module + callable function + everything qualified.** Each test file is a
    module with an entry function redefined in the outer scope; fakes at module
@@ -67,7 +67,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 | [`types-traits-interfaces.md`](rules/types.md) | Types vs traits, interfaces/contracts, SOLID/DRY/YAGNI, type stability |
 | [`dimension-and-shape.md`](rules/dimension.md) | "1-D is a scalar" convention: state/control/variable shape, boundary rules, testing |
 | [`exceptions.md`](rules/exceptions.md) | The 7 exceptions and the choice rule |
-| [`docstrings.md`](philosophy/docstrings.md) | Docstring templates, cross-references, example safety |
+| [`docstrings.md`](rules/docstrings.md) | Docstring templates, cross-references, example safety |
 | [`testing.md`](rules/testing.md) | Categories, fakes/stubs, **module + callable function template** |
 | [`performance.md`](rules/performance.md) | Hot path vs. setup path, JET setup, `@inferred` + allocation guards |
 | [`documentation.md`](philosophy/documentation.md) | API generation, guides, draft workflow |
