@@ -3,12 +3,16 @@
 How performance properties are made *verifiable and enforced* — static analysis with
 JET, then regression guards locking in what was verified. For the *design* principles
 (parametric fields, function barriers, no `Any` in hot paths), see
-[`types-traits-interfaces.md`](types-traits-interfaces.md#type-stability). For
-*running* tests, see [`../RULES.md`](../RULES.md).
+[`TYP8`](types.md#typ8--type-stability-by-default). For *running* tests, see
+[`method.md`](../method.md).
 
-## The principle: hot path vs. setup path
+Identifiers: `PERF1`–`PERF6` (see [`README.md`](../README.md#rule-identifiers)).
 
-Before measuring anything, classify the code. Every performance decision below
+---
+
+## PERF1 — Classify hot path vs. setup path; guard the hot path only
+
+**Rule.** Before measuring anything, classify the code. Every performance decision below
 follows from this split:
 
 - **Hot path** — called repeatedly during a computation: evaluating a wrapped
@@ -21,14 +25,19 @@ follows from this split:
   dispatch here is often **by design** (runtime-extensible registries need
   `Vector`/`Dict` storage with abstract element types) and its cost is paid once.
 
-The rule: **keep the hot path inferable and allocation-clean; do not chase dispatch
-warnings in one-time construction code.** A guard asserted on setup-path code is not
-a regression guard — it is a permanently red assertion of an accepted trade-off.
+**Keep the hot path inferable and allocation-clean; do not chase dispatch warnings in
+one-time construction code.**
 
-## Order of operations
+**Why.** A guard asserted on setup-path code is not a regression guard — it is a
+permanently red assertion of an accepted trade-off.
 
-Guards lock in a *verified* state; locking in an unhealthy state freezes bad
-numbers. So the sequence matters:
+**Check.** `judgment`.
+
+---
+
+## PERF2 — Scan for correctness first, investigate, then lock in
+
+**Rule.** Guards lock in a *verified* state, so the sequence matters:
 
 1. **Correctness scan first** (`JET.report_package`, one-off) — find latent bugs
    (`MethodError`s, undefined names) and JET false positives. Fix the bugs; verify
@@ -36,10 +45,9 @@ numbers. So the sequence matters:
 2. **Stability investigation** (`JET.@report_opt` on concrete hot-path calls;
    `Cthulhu.@descend` / `@code_warntype` to find root causes) — fix instabilities at
    their origin, not at the call site.
-3. **Only then, lock in** — `@inferred` stability guards and `@ballocated`
-   allocation guards on the now-verified entry points.
-
-## JET
+3. **Only then, lock in** — `@inferred` stability guards ([`PERF4`](#perf4--inferred-guards-on-verified-hot-path-calls))
+   and `@ballocated` allocation guards ([`PERF5`](#perf5--an-allocation-contract-never-wall-clock-time))
+   on the now-verified entry points.
 
 JET has **two analyzers**; conflating them is the most common setup mistake:
 
@@ -51,29 +59,25 @@ JET has **two analyzers**; conflating them is the most common setup mistake:
 `report_package` does **not** detect type instabilities; `@report_opt` does, but
 only for the calls you give it.
 
-### Setup
+**Why.** Locking in an unhealthy state freezes bad numbers.
 
-JET is a dev/test dependency, never a runtime one:
+**Check.** `judgment` (a process, not a property of the code).
 
-```toml
-[extras]
-JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+---
 
-[targets]
-test = ["JET", "Test", ...]
+## PERF3 — `JET.test_package` enabled, and genuinely clean
 
-[compat]
-JET = "0.11"
-```
-
-Once the one-off scan is clean, enable it permanently in the code-quality test file,
-scoped to the package's own modules:
+**Rule.** Once the one-off scan is clean, enable it permanently in the code-quality test
+file, scoped to the package's own modules — and keep it genuinely clean: no tolerated
+red.
 
 ```julia
 Test.@testset "JET" begin
     JET.test_package(MyPackage; target_modules=(MyPackage,))
 end
 ```
+
+**Why.** A suite that is red on a known false positive trains everyone to ignore it.
 
 ### False positives
 
@@ -87,8 +91,7 @@ When JET flags code that demonstrably works:
    machinery that blinds the analyzer can be a genuine instability when its argument
    is not a compile-time constant. Replacing it with straight-line code frequently
    fixes both at once.
-3. Enable `test_package` only when the scan is genuinely clean — a suite that is red
-   on a known false positive trains everyone to ignore it.
+3. Enable `test_package` only when the scan is genuinely clean.
 
 ### Benign collector noise: "skipping callee ... UndefRefError()"
 
@@ -142,10 +145,15 @@ end
 in `[extras]`/`[targets]["test"]`/`[compat]`, the same as any other stdlib used only
 under `test/`.
 
-## Stability guards: `Test.@inferred`
+**Check.** `exact` (to be tooled): the test suite calls `JET.test_package` with
+`target_modules`; it passing is checked by CI.
 
-One guard per verified hot-path entry point, added to the **existing testset that
-owns the fixture** — not blanket coverage, and never on setup-path functions.
+---
+
+## PERF4 — `@inferred` guards on verified hot-path calls
+
+**Rule.** One guard per verified hot-path entry point, added to the **existing testset
+that owns the fixture** — not blanket coverage, and never on setup-path functions.
 
 ```julia
 Test.@testset "Type stability" begin
@@ -155,21 +163,22 @@ Test.@testset "Type stability" begin
 end
 ```
 
-`@inferred` applies to **calls only**, never field access
-(see [`testing.md`](testing.md)).
+`@inferred` applies to **calls only**, never field access (see [`TST7`](testing.md)).
 
-## Allocation guards: `BenchmarkTools.@ballocated`
+**Why.** The guard turns a verified stability into a regression test, next to the
+fixture that exercises it.
 
-Type stability is necessary but not sufficient: a change can stay fully inferable
-yet start allocating (a stray `collect`, a boxed closure, an abstract field). Guard
-the complementary property with allocation counts, which — unlike wall-clock time —
-are **deterministic**: no run-to-run noise, no machine dependence, `== 0` either
-holds or does not. **Never assert wall-clock time in a test suite.**
+**Check.** `judgment`: which calls are hot is decided by
+[`PERF1`](#perf1--classify-hot-path-vs-setup-path-guard-the-hot-path-only).
 
-Gather these in one dedicated "performance contract" file
-(`test/suite/meta/test_performance.jl`, next to the code-quality file), so the
-package's performance guarantees are legible in one place. `BenchmarkTools` joins
-the test target the same way JET does. Two invariant classes:
+---
+
+## PERF5 — An allocation contract, never wall-clock time
+
+**Rule.** Guard allocations with `BenchmarkTools.@ballocated`, with `$` interpolation,
+in one dedicated "performance contract" file (`test/suite/meta/test_performance.jl`,
+next to the code-quality file). **Never assert wall-clock time in a test suite.** Two
+invariant classes:
 
 **Zero-overhead wrappers** — a wrapper call must allocate exactly what the raw
 wrapped function does. Compare wrapper to raw rather than to a magic constant, so
@@ -201,6 +210,41 @@ Note the `$` interpolation: without it, `@ballocated` benchmarks global-variable
 access and reports spurious allocations. These guards run fast (allocation counts
 need almost no sampling) and belong in the normal suite — no separate CI.
 
+**Why.** Type stability is necessary but not sufficient: a change can stay fully
+inferable yet start allocating (a stray `collect`, a boxed closure, an abstract
+field). Allocation counts — unlike wall-clock time — are **deterministic**: no
+run-to-run noise, no machine dependence, `== 0` either holds or does not. One file
+makes the package's performance guarantees legible in one place.
+
+**Check.** `exact` (to be tooled) for wall-clock assertions (`@elapsed`, `@time`,
+`@btime` inside `@test`); `heuristic` for `@ballocated` without `$` interpolation.
+
+---
+
+## PERF6 — JET and BenchmarkTools are test dependencies
+
+**Rule.** JET and BenchmarkTools are dev/test dependencies, never runtime ones — in
+`[extras]` and the test target (plus `docs/Project.toml` if live doc checks are used),
+never in `[deps]`:
+
+```toml
+[extras]
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+
+[targets]
+test = ["JET", "Test", ...]
+
+[compat]
+JET = "0.11"
+```
+
+**Why.** Users of the package never pay for its verification tooling.
+
+**Check.** `exact` (to be tooled): neither package appears in `[deps]` of
+`Project.toml`.
+
+---
+
 ## Optional: live checks in the documentation
 
 A performance guide page can *execute* `JET.@report_opt` on hot-path calls at
@@ -220,21 +264,3 @@ docs build instead of letting the page go stale. Keep only stable-output checks
 live; illustrate known-dynamic constructions in non-executed ` ```julia ` blocks,
 because dispatch traces embed Base-internal `file:line` strings that shift between
 Julia versions and would make the build fragile.
-
-## Checklist
-
-- [ ] Hot path vs. setup path identified; guards target the hot path only.
-- [ ] One-off `JET.report_package` scan run; real bugs fixed; false positives
-      verified by hand (and the flagged pattern simplified where it was also a
-      genuine instability).
-- [ ] `JET.test_package(...; target_modules=...)` enabled in the code-quality test
-      file, and genuinely clean — no tolerated red. Benign `LoweredCodeUtils`
-      "skipping callee" noise (if any keyword-argument functor methods exist)
-      filtered precisely, not silenced wholesale.
-- [ ] `Test.@inferred` guard on each verified hot-path call, in the testset that
-      owns the fixture.
-- [ ] Allocation contract in `test/suite/meta/test_performance.jl`:
-      wrapper-vs-raw equalities and `== 0` reads, via `@ballocated` with `$`
-      interpolation; no wall-clock assertions anywhere.
-- [ ] JET and BenchmarkTools in `[extras]`/test target (+ docs env if live doc
-      checks are used) — never in `[deps]`.
