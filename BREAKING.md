@@ -4,7 +4,7 @@
 This document lists breaking changes to the Handbook: removed or renamed files and
 sections, or rule changes that require existing packages to adapt. Each entry comes
 with a migration block, as described in
-[`philosophy/changelog.md`](philosophy/changelog.md).
+[`CHG3`](rules/changelog.md#chg3--breaking-entries-appear-in-both-files-with-a-migration-block).
 
 ## Baseline (0.1.0)
 
