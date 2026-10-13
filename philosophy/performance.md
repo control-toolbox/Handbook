@@ -3,7 +3,7 @@
 How performance properties are made *verifiable and enforced* — static analysis with
 JET, then regression guards locking in what was verified. For the *design* principles
 (parametric fields, function barriers, no `Any` in hot paths), see
-[`types-traits-interfaces.md`](types-traits-interfaces.md#type-stability). For
+[`types-traits-interfaces.md`](../rules/types.md#typ8--type-stability-by-default). For
 *running* tests, see [`../RULES.md`](../RULES.md).
 
 ## The principle: hot path vs. setup path

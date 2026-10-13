@@ -24,15 +24,15 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
    are traits in a type parameter. Dispatch by extracting the trait. Aliases and
    `where` clauses must repeat each named parameter's original bound verbatim, or
    dispatch silently breaks.
-   → [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md)
+   → [`types-traits-interfaces.md`](rules/types.md)
 
 4. **Program against abstractions.** Methods live on abstract types as much as
    possible; contracts are `NotImplemented` stubs; subtypes honor the contract (LSP).
-   → [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md)
+   → [`types-traits-interfaces.md`](rules/types.md)
 
 5. **SOLID, DRY, KISS, YAGNI.** Single responsibility, open/closed via dispatch, no
    duplication, the simplest thing that works, nothing speculative.
-   → [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md)
+   → [`types-traits-interfaces.md`](rules/types.md)
 
 6. **Structured errors.** Seven typed exceptions; sharp rule: single-argument value →
    `IncorrectArgument`; relation/state/composition → `PreconditionError`; unimplemented
@@ -43,7 +43,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
    paths, function barriers. Verified with JET, then locked in as regression guards:
    `@inferred` for stability, `@ballocated` for allocation invariants — on the hot
    path only, never on one-time setup code.
-   → [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md#type-stability),
+   → [`types-traits-interfaces.md`](rules/types.md#typ8--type-stability-by-default),
    [`performance.md`](philosophy/performance.md)
 
 8. **Everything is documented.** A docstring on every symbol, fixed templates,
@@ -64,7 +64,7 @@ The detail files referenced below live in the [`philosophy/`](philosophy/) direc
 | File | Content |
 | --- | --- |
 | [`modules.md`](rules/modules.md) | Submodule organization, imports/qualification, DAG, exports |
-| [`types-traits-interfaces.md`](philosophy/types-traits-interfaces.md) | Types vs traits, interfaces/contracts, SOLID/DRY/YAGNI, type stability |
+| [`types-traits-interfaces.md`](rules/types.md) | Types vs traits, interfaces/contracts, SOLID/DRY/YAGNI, type stability |
 | [`dimension-and-shape.md`](philosophy/dimension-and-shape.md) | "1-D is a scalar" convention: state/control/variable shape, boundary rules, testing |
 | [`exceptions.md`](philosophy/exceptions.md) | The 7 exceptions and the choice rule |
 | [`docstrings.md`](philosophy/docstrings.md) | Docstring templates, cross-references, example safety |

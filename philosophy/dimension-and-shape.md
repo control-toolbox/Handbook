@@ -1,7 +1,7 @@
 # Dimension and shape: 1-D is a scalar
 
 How control-theoretic quantities are shaped across the ecosystem. Generic examples.
-For types vs traits, see [`types-traits-interfaces.md`](types-traits-interfaces.md).
+For types vs traits, see [`types-traits-interfaces.md`](../rules/types.md).
 
 ## The rule
 
