@@ -36,7 +36,7 @@ examples stay generic (no package-specific symbols).
 
 3. **[`method.md`](method.md)** — how to work: running tests, coverage,
    building the docs, capturing output.
-4. **[`plan.md`](plan.md)** — the implementation plan template.
+4. **[`plan-template.md`](plan-template.md)** — the implementation plan template.
 
 ---
 
