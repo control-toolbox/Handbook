@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 📚 Documentation
+
+- A package no longer vendors the conventions as a git submodule: `Pkg.add` cannot
+  install a package that contains one on Julia 1.10, which blocked a registration of
+  CTBase. It pins a tag in `AGENTS.md` and reads a git-ignored clone in `.conventions/`
+  ([Using the conventions in a package](README.md#using-the-conventions-in-a-package)).
+
+### 🔧 Internal
+
+- Releases are automatic: merging a release PR (a new `## [X.Y.Z]` section in this
+  changelog) tags the merge commit and creates the GitHub release.
+
 ## [0.3.0] - 2026-10-14
 
 ### ✨ New Features

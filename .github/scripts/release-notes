@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Usage: release-notes [CHANGELOG.md]
+# Prints "vX.Y.Z" on the first line, then the notes: the body of the first
+# "## [X.Y.Z]" section of the changelog ([Unreleased] is skipped).
+set -euo pipefail
+file="${1:-CHANGELOG.md}"
+version=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' "$file" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') || {
+  echo "no '## [X.Y.Z]' heading in $file" >&2; exit 1; }
+echo "v$version"
+awk -v h="## [$version]" '
+  index($0, h) == 1 { on = 1; next }
+  on && /^## \[/   { exit }
+  on               { print }
+' "$file" | sed -e '/./,$!d'
