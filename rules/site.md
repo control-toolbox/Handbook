@@ -5,7 +5,7 @@ How docstrings become a published site via Documenter.jl and
 [`docstrings.md`](docstrings.md) (what to write *inside* docstrings). For *building*
 the docs (draft-first workflow, local preview), see [`method.md`](../method.md).
 
-Identifiers: `SITE1`–`SITE13` (see [`README.md`](../README.md#rule-identifiers)).
+Identifiers: `SITE1`–`SITE14` (see [`README.md`](../README.md#rule-identifiers)).
 
 ## Backend
 
@@ -519,6 +519,34 @@ reason), the CI job completes cleanly instead of crashing at `deploydocs`.
 
 **Check.** `exact` (to be tooled): tag filter in `Documentation.yml` and the
 `bases.txt` guard in `make.jl`.
+
+---
+
+## SITE14 — Pin the npm dependencies of `docs/package.json`
+
+**Rule.** Every dependency in `docs/package.json` is pinned to an exact version: no `^`,
+no `~`, no range. This applies to `vitepress` and to every plugin that declares a peer
+dependency on it (`@nolebase/*`, `vitepress-plugin-*`), and by default to everything
+else. Bump versions deliberately, in a dedicated commit.
+
+```json
+{
+  "dependencies": {
+    "@nolebase/vitepress-plugin-enhanced-readabilities": "2.18.2",
+    "vitepress": "1.6.4"
+  }
+}
+```
+
+**Why.** The repository has no lockfile, and DocumenterVitepress runs a plain
+`npm install` at build time. A caret range therefore resolves to the latest release on
+every build, so one upstream release can break the documentation of every package at the
+same time. This happened with `@nolebase/vitepress-plugin-enhanced-readabilities@2.21.x`,
+which requires `vitepress@^2.0.0-alpha` while the packages use `vitepress@^1.6.4`:
+`npm install` failed with `ERESOLVE` and the build of a release tag failed.
+
+**Check.** `exact` (to be tooled): no version string in `docs/package.json` starts with
+`^`, `~`, `>`, `<` or `*`.
 
 ---
 

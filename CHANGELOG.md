@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ New Features
+
+- `SITE14`: dependencies in `docs/package.json` are pinned to exact versions. A caret
+  range let `@nolebase/vitepress-plugin-enhanced-readabilities@2.21.x` (peer
+  `vitepress@^2`) break `npm install` in every package's documentation build.
+
 ## [0.2.0] - 2026-10-13
 
 The Handbook becomes **ct-conventions**: coding conventions only, one identifier per
