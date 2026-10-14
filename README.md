@@ -108,7 +108,7 @@ from. A review report, a plan or an agent run that applies the conventions state
 the version at its top:
 
 ```text
-Conventions: ct-conventions v0.2.0 (commit 1a2b3c4)
+Conventions: ct-conventions v0.3.1 (commit 1a2b3c4)
 ```
 
 ```bash
@@ -119,21 +119,21 @@ git -C .conventions describe --tags --always
 
 ## Using the conventions in a package
 
-Add the repository as a git submodule, pinned to a release tag:
+A package pins a release tag in its `AGENTS.md` ("Pinned version: ct-conventions
+vX.Y.Z") and reads the rules from a local clone at that tag, in `.conventions/`, which
+it lists in `.gitignore`:
 
 ```bash
-git submodule add https://github.com/control-toolbox/ct-conventions.git .conventions
-git -C .conventions checkout vX.Y.Z
+rm -rf .conventions
+git -c advice.detachedHead=false clone --quiet --depth 1 --branch vX.Y.Z \
+  https://github.com/control-toolbox/ct-conventions.git .conventions
 ```
 
-Clone a package with `git clone --recurse-submodules`, or run
-`git submodule update --init` in an existing clone. To bump the conventions:
+To bump the conventions, change the tag in `AGENTS.md` and clone again.
 
-```bash
-git -C .conventions fetch --tags && git -C .conventions checkout vX.Y.Z
-```
-
-then commit the updated pointer.
+**Not a git submodule.** On Julia 1.10, `Pkg.add` fails on a package whose tree contains
+a submodule (`GitError: cannot get submodules without a working tree`), and so does the
+General registry's AutoMerge, which installs on the lowest compatible Julia version.
 
 ---
 
@@ -162,5 +162,7 @@ Earlier states of the repository, under its former name `Handbook`, are tagged
    `## [X.Y.Z] - YYYY-MM-DD` heading, and update [`BREAKING.md`](BREAKING.md) if
    needed.
 2. Merge the change on `main`.
-3. Tag the merge commit: `git tag vX.Y.Z && git push origin vX.Y.Z`, then create a
-   GitHub release from the tag.
+3. That is all: on the push to `main`, the [`Release`](.github/workflows/release.yml)
+   workflow tags the merge commit `vX.Y.Z` and creates the GitHub release, with the
+   changelog section as notes. It does nothing if the first `## [X.Y.Z]` section is
+   already tagged; it can be rerun by hand (`workflow_dispatch`).

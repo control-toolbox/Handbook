@@ -1,0 +1,39 @@
+name: Release
+
+# On every push to main that touches the changelog: if the first "## [X.Y.Z]"
+# section of CHANGELOG.md has no tag yet, tag the pushed commit vX.Y.Z and create
+# the GitHub release, with that section as notes. Merging a release PR is enough.
+
+on:
+  push:
+    branches: [main]
+    paths: [CHANGELOG.md]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Tag and release the new version, if any
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .github/scripts/release-notes CHANGELOG.md > release.txt
+          tag=$(head -n 1 release.txt)
+          tail -n +2 release.txt > notes.md
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "$tag already exists: nothing to release."
+            exit 0
+          fi
+          gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes-file notes.md --latest
+          echo "Released $tag at $GITHUB_SHA."
