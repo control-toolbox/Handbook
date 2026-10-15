@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ New Features
+
+- `SITE15`: an error raised because an extension is not loaded is shown from a fresh
+  Julia process (`NoExt.repl`), never from `@repl` (the build loads every extension) nor
+  as hand-written output; the build fails if the example no longer throws.
+- `SITE16`: warnings shown in `@example` blocks carry no build-machine path
+  (`DocLogs.run`).
+- `SITE17`: a GPU page runs on every build, its device blocks guarded by
+  `CUDA.functional()`, with a note that the output depends on the machine; the GPU pass
+  of CTActions (`gpu_runner`) republishes it with device output.
+
+### 🛠 Enhancements
+
+- `SITE13` tightened to what the packages do: PR previews are deployed only with the
+  `documentation push preview` label (`push_preview` read from
+  `DOCUMENTER_PUSH_PREVIEW`), removed when the PR is closed (`DocPreviewCleanup.yml`),
+  and `opened` is no longer in the PR `types`. The example showed a hardcoded
+  `push_preview=true` and `opened`.
+
+### 📚 Documentation
+
+- Notes on the VitePress backend: tables are right-aligned unless the separator row
+  says otherwise; an `@example` block that returns a value does not show what it
+  printed.
+
 ## [0.4.0] - 2026-10-15
 
 ### ✨ New Features
