@@ -1,4 +1,3 @@
-<!-- markdownlint-disable MD024 -->
 # Changelog
 
 All notable changes to ct-conventions (formerly the control-toolbox Handbook) will be documented in this file.
@@ -7,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### ✨ New Features
+
+- `GEN2`: one `.markdownlint.json` in every repository, with the reason for each rule
+  switched off (`MD013`, `MD033`, `MD046`, `MD051`) or relaxed (`MD024`, siblings only),
+  measured on the eight packages. Replaces the `markdownlint-disable MD024` comments of
+  the changelogs.
+
+### 🔧 Internal
+
+- `CHG2`: the `CHANGELOG.md` header no longer starts with
+  `<!-- markdownlint-disable MD024 -->`; `.markdownlint.json` relaxes `MD024` instead
+  (`GEN2`).
+- This repository follows `GEN2` (`.markdownlint.json` added, comments removed).
 
 ## [0.3.1] - 2026-10-14
 
