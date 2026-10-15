@@ -5,7 +5,7 @@ How docstrings become a published site via Documenter.jl and
 [`docstrings.md`](docstrings.md) (what to write *inside* docstrings). For *building*
 the docs (draft-first workflow, local preview), see [`method.md`](../method.md).
 
-Identifiers: `SITE1`–`SITE14` (see [`README.md`](../README.md#rule-identifiers)).
+Identifiers: `SITE1`–`SITE17` (see [`README.md`](../README.md#rule-identifiers)).
 
 ## Backend
 
@@ -477,10 +477,11 @@ the format used when Plots saves to a file path, not how Documenter captures the
 
 ---
 
-## SITE13 — Deploy on stable tags only, and guard `deploydocs`
+## SITE13 — Deploy on stable tags only, guard `deploydocs`, previews on request
 
-**Rule.** The documentation workflow triggers on stable tags only, and `make.jl` calls
-`deploydocs` only when bases were built.
+**Rule.** The documentation workflow triggers on stable tags only, `make.jl` calls
+`deploydocs` only when bases were built, and a pull request deploys its preview only when
+it carries the `documentation push preview` label.
 
 ```yaml
 # .github/workflows/Documentation.yml
@@ -491,7 +492,17 @@ on:
     tags:
       - 'v[0-9]+\.[0-9]+\.[0-9]+'   # v0.26.0 yes, v0.26.0-beta no
   pull_request:
-    types: [labeled, synchronize, opened, reopened]
+    types: [labeled, synchronize, reopened]
+
+jobs:
+  call:
+    if: >
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'run documentation') &&
+        (github.event.action != 'labeled' ||
+         github.event.label.name == 'run documentation' ||
+         github.event.label.name == 'documentation push preview'))
+    uses: control-toolbox/CTActions/.github/workflows/documentation.yml@main
 ```
 
 ```julia
@@ -499,7 +510,9 @@ on:
 bases_file = joinpath(@__DIR__, "build", "bases.txt")
 if isfile(bases_file)
     DocumenterVitepress.deploydocs(;
-        repo=repo_url * ".git", devbranch="main", push_preview=true
+        repo=repo_url * ".git",
+        devbranch="main",
+        push_preview=get(ENV, "DOCUMENTER_PUSH_PREVIEW", "false") == "true",
     )
 else
     @info "Skipping deployment: no bases were built (prerelease with existing higher stable release)."
@@ -507,7 +520,13 @@ end
 ```
 
 Push to `main` still deploys the `dev` version of the docs. Only pushes of stable tags
-trigger the versioned deployment.
+trigger the versioned deployment. On a pull request, `run documentation` is the only
+trigger; `documentation push preview` is a modifier that also deploys the build to
+`previews/PR<n>`, and does nothing on its own. The reusable workflow of CTActions sets
+`DOCUMENTER_PUSH_PREVIEW` from that label, and a `DocPreviewCleanup.yml` caller removes the
+preview when the PR is closed. The labels, the `if:` guard and the cleanup caller are
+described in
+[CTActions `docs/WORKFLOWS.md`](https://github.com/control-toolbox/CTActions/blob/main/docs/WORKFLOWS.md).
 
 **Why.** By default a documentation workflow triggers on `tags: '*'`, which includes
 prerelease tags such as `v0.26.0-beta`. DocumenterVitepress does **not** deploy
@@ -517,8 +536,13 @@ causes `deploydocs` to crash because it expects a `bases.txt` file that was neve
 written. The guard is a belt-and-suspenders safeguard: if `makedocs` built 0 bases (any
 reason), the CI job completes cleanly instead of crashing at `deploydocs`.
 
-**Check.** `exact` (to be tooled): tag filter in `Documentation.yml` and the
-`bases.txt` guard in `make.jl`.
+A hardcoded `push_preview=true` deploys every PR build, which fills `gh-pages` with
+`previews/PR<n>` directories nobody looks at. `opened` is left out of the PR `types`: a
+PR created with its labels emits both `opened` and `labeled`, which would build twice.
+
+**Check.** `exact` (to be tooled): tag filter, PR `types` and `if:` guard in
+`Documentation.yml`; `bases.txt` guard and `DOCUMENTER_PUSH_PREVIEW` in `make.jl`;
+`DocPreviewCleanup.yml` present.
 
 ---
 
@@ -547,6 +571,98 @@ which requires `vitepress@^2.0.0-alpha` while the packages use `vitepress@^1.6.4
 
 **Check.** `exact` (to be tooled): no version string in `docs/package.json` starts with
 `^`, `~`, `>`, `<` or `*`.
+
+---
+
+## SITE15 — Errors of a missing extension come from a fresh process
+
+**Rule.** An error raised because a weak dependency is not loaded (an `ExtensionError`,
+or any error that only exists without the extension) is shown from a **fresh Julia
+process** in which only the package is loaded, never from an `@repl` block and never as
+hand-written output. The build fails if the example no longer throws.
+
+````markdown
+```@eval
+Main.NoExt.repl("CTSolvers.Solvers.Ipopt()")
+```
+````
+
+`NoExt.repl(codes...)` (CTSolvers `docs/noext.jl`) runs the snippets in
+`julia --project=docs` with the docs `LOAD_PATH`, evaluates all but the last, and returns
+the error of the last one as a `julia-repl-runs` ANSI block, rendered like an `@repl`
+block. It throws when the last snippet succeeds.
+
+**Why.** `make.jl` loads every weak dependency so that the API reference can document
+the extensions (`SITE3`), and extension methods are global to the process: no module or
+`@setup` scope can hide them. In the build, the constructor that should fail succeeds,
+so `@repl` shows a working instance. Hand-written output avoids that but goes stale
+silently; the fresh process keeps the example executed and checked.
+
+**Check.** `judgment`: the page shows an error that depends on a missing extension.
+
+---
+
+## SITE16 — Log records in examples carry no build-machine path
+
+**Rule.** An `@example` block that is meant to show a warning captures its log records
+and prints them without the source location, through hidden lines:
+
+````markdown
+```@example page
+Main.DocLogs.run(; show = true) do # hide
+CTSolvers.Solvers.Ipopt(bound_relax_factor = 1e-10; mode = :permissive)
+end # hide
+```
+````
+
+`DocLogs.run(f; show=false)` (CTSolvers `docs/doclogs.jl`) evaluates `f()` under a
+`Test.TestLogger`, prints each warning as `┌ Warning: …` / `│ …` / `└ @ Module`, and
+returns the value of `f()`. With `show = true` it prints the value after the warnings and
+returns `nothing` (see the note on printed output below). Variables assigned inside the
+block are declared `global` on a hidden line.
+
+**Why.** Documenter prints a log record with its source location,
+`└ @ Module /path/on/the/build/machine/file.jl:line`, which publishes local or CI paths
+and changes with every machine that builds the page.
+
+**Check.** `exact` (to be tooled): no absolute path in the built pages under
+`docs/build/`.
+
+---
+
+## SITE17 — Device pages run on every build
+
+**Rule.** A page about GPU execution is executed on every build, CPU or GPU. Every block
+that needs a device is guarded by `CUDA.functional()` or wrapped in `try/catch`, the
+page opens with a note that its output depends on the machine that built it, and its
+first block prints which case it is. The workflow passes a GPU runner to CTActions
+(`gpu_runner`) so that the published page is rebuilt on a device after the CPU build.
+
+```julia
+if CUDA.functional()
+    # ... the device code ...
+else
+    println("No functional GPU on the machine that built this page: ",
+            "no device integration.")
+end
+```
+
+```markdown
+!!! note "What you are reading depends on the machine that built this page"
+    Every block below is executed when the documentation is built. With a functional
+    CUDA device you are reading real GPU output; without one, you are reading what this
+    exact code really produces on a machine without a GPU.
+```
+
+A package whose documentation has no device page sets no `gpu_runner` and builds on CPU
+only.
+
+**Why.** A static GPU page goes stale without anyone noticing, and a page that runs only
+on a device cannot be built by a PR or on a GitHub-hosted runner. Guarded blocks keep one
+source for both: the CPU build always publishes, the GPU pass (push to `main` and tags,
+never failing the workflow) upgrades it with real device output.
+
+**Check.** `judgment`: device code in a docs page is guarded, and the note is present.
 
 ---
 
@@ -669,6 +785,15 @@ from Documenter to DocumenterVitepress is a separate recipe, in
   .dark .oc-logo--dark  { display: block; }
   </style>
   ```
+
+- **Tables are right-aligned by default.** A Markdown table whose separator row has no
+  alignment (`| --- |`) is rendered with right-aligned columns. Write the alignment
+  explicitly, `| :--- |` for text.
+
+- **Printed output is dropped when a block returns a value.** An `@example` block whose
+  last expression is not `nothing` shows that value only; what the block printed (with
+  `println`, or a log record) is not shown. End the block with `nothing # hide` to keep
+  the printed output, or print the value yourself.
 
 - **Build output** is in `docs/build/1/`, not `docs/build/`; DocumenterVitepress requires
   a git repository.
