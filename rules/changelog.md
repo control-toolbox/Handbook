@@ -28,7 +28,6 @@ place without reading every entry in the full log.
 header:
 
 ```markdown
-<!-- markdownlint-disable MD024 -->
 # Changelog
 
 All notable changes to <PackageName> will be documented in this file.

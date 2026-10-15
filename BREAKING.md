@@ -1,4 +1,3 @@
-<!-- markdownlint-disable MD024 -->
 # Breaking Changes
 
 This document lists breaking changes to ct-conventions (formerly the Handbook): removed or renamed files and
