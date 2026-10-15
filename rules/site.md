@@ -583,14 +583,16 @@ hand-written output. The build fails if the example no longer throws.
 
 ````markdown
 ```@eval
-Main.NoExt.repl("CTSolvers.Solvers.Ipopt()")
+Main.CTBase.DevTools.repl_without_extensions(:CTSolvers, "CTSolvers.Solvers.Ipopt()")
 ```
 ````
 
-`NoExt.repl(codes...)` (CTSolvers `docs/noext.jl`) runs the snippets in
-`julia --project=docs` with the docs `LOAD_PATH`, evaluates all but the last, and returns
-the error of the last one as a `julia-repl-runs` ANSI block, rendered like an `@repl`
-block. It throws when the last snippet succeeds.
+`CTBase.DevTools.repl_without_extensions(package, codes...)` (CTBase ≥ 0.30.10,
+`DocumenterReference` extension, loaded by every `make.jl`) runs the snippets in a fresh
+process on the docs environment with the docs `LOAD_PATH`, where only `package` is loaded.
+It evaluates all but the last, and returns the error of the last one as a
+`julia-repl-runs` ANSI block, rendered like an `@repl` block. It throws when the last
+snippet succeeds. `make.jl` has `using CTBase`, hence `Main.CTBase` in the page.
 
 **Why.** `make.jl` loads every weak dependency so that the API reference can document
 the extensions (`SITE3`), and extension methods are global to the process: no module or
@@ -609,15 +611,15 @@ and prints them without the source location, through hidden lines:
 
 ````markdown
 ```@example page
-Main.DocLogs.run(; show = true) do # hide
+Main.CTBase.DevTools.warnings_without_paths(; show = true) do # hide
 CTSolvers.Solvers.Ipopt(bound_relax_factor = 1e-10; mode = :permissive)
 end # hide
 ```
 ````
 
-`DocLogs.run(f; show=false)` (CTSolvers `docs/doclogs.jl`) evaluates `f()` under a
-`Test.TestLogger`, prints each warning as `┌ Warning: …` / `│ …` / `└ @ Module`, and
-returns the value of `f()`. With `show = true` it prints the value after the warnings and
+`CTBase.DevTools.warnings_without_paths(f; show=false)` (CTBase ≥ 0.30.10) evaluates
+`f()` with its log records captured, prints each warning or error as `┌ Warning: …` /
+`│ …` / `└ @ Module`, and returns the value of `f()`. With `show = true` it prints the value after the warnings and
 returns `nothing` (see the note on printed output below). Variables assigned inside the
 block are declared `global` on a hidden line.
 
