@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-15
+
 ### 📚 Documentation
 
 - `SITE15`, `SITE16`: the helpers are now in CTBase (≥ 0.30.10),
