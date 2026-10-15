@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-15
+
 ### ✨ New Features
 
 - `SITE15`: an error raised because an extension is not loaded is shown from a fresh
